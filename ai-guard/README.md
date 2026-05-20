@@ -113,6 +113,24 @@ For offline or repeated installs on other PCs:
 
 Do not leave placeholder values like `https://your-company-host/...` in the command. Omit `-ExtensionUpdateUrl` to use the local daemon update endpoint, or replace it with a real reachable HTTPS URL.
 
+If you want a no-command setup for end users or IT operators, build the single-file setup executable:
+
+```powershell
+.\installer\scripts\build-setup-exe.ps1
+```
+
+That produces:
+
+- `installer/dist/AI-Guard-Setup.exe`
+
+The setup executable:
+
+- requests administrator approval automatically
+- shows a simple Install / Repair / Uninstall GUI
+- extracts the bundled AI Guard + PII payload to a temporary folder
+- runs `install-enterprise.ps1 -SkipBuild` internally
+- does not require the operator to type any PowerShell commands
+
 The installer:
 
 - Builds the daemon release binary

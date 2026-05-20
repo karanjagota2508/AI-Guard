@@ -2,6 +2,10 @@ daemon/target/
 installer/dist/*
 !installer/dist/ai-guard-daemon.exe
 !installer/dist/ai-guard-extension.crx
+!installer/dist/AI-Guard-Setup.exe
+installer/bootstrapper/bin/
+installer/bootstrapper/obj/
+installer/bootstrapper/payload.zip
 logs/
 *.log
 installer/assets/extension-private-key.pem
