@@ -76,6 +76,11 @@ $config = @{
     logging = @{
         directory = $LogDirectory
     }
+    admin_console = @{
+        password_hash = ""
+        password_salt = ""
+        password_iterations = 150000
+    }
 }
 
 $json = $config | ConvertTo-Json -Depth 8

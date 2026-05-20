@@ -148,8 +148,233 @@ function Normalize-ConfigShape {
     $ConfigObject["blocking"]["browser_hosts"] = Ensure-StringArray $ConfigObject["blocking"]["browser_hosts"]
     $ConfigObject["blocking"]["process_names"] = Ensure-StringArray $ConfigObject["blocking"]["process_names"]
     $ConfigObject["blocking"]["exempt_process_names"] = Ensure-StringArray $ConfigObject["blocking"]["exempt_process_names"]
+
+    if (-not $ConfigObject.Contains("admin_console")) {
+        $ConfigObject["admin_console"] = [ordered]@{}
+    }
+
+    if (-not $ConfigObject["admin_console"].Contains("password_hash")) {
+        $ConfigObject["admin_console"]["password_hash"] = ""
+    }
+    if (-not $ConfigObject["admin_console"].Contains("password_salt")) {
+        $ConfigObject["admin_console"]["password_salt"] = ""
+    }
+    if (-not $ConfigObject["admin_console"].Contains("password_iterations")) {
+        $ConfigObject["admin_console"]["password_iterations"] = 150000
+    }
 }
 
+function New-AdminConsoleSalt {
+    $bytes = New-Object byte[] 16
+    [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+    return [Convert]::ToBase64String($bytes)
+}
+
+function Get-AdminConsolePasswordHash {
+    param(
+        [string]$Password,
+        [string]$SaltBase64,
+        [int]$Iterations
+    )
+
+    $salt = [Convert]::FromBase64String($SaltBase64)
+    $deriveBytes = New-Object System.Security.Cryptography.Rfc2898DeriveBytes(
+        $Password,
+        $salt,
+        $Iterations,
+        [System.Security.Cryptography.HashAlgorithmName]::SHA256
+    )
+
+    try {
+        $hashBytes = $deriveBytes.GetBytes(32)
+        return [Convert]::ToBase64String($hashBytes)
+    } finally {
+        $deriveBytes.Dispose()
+    }
+}
+
+function Show-PasswordPrompt {
+    param(
+        [string]$Title,
+        [string]$Message,
+        [switch]$Confirm
+    )
+
+    $dialog = New-Object System.Windows.Forms.Form
+    $dialog.Text = $Title
+    $dialog.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+    $dialog.Size = if ($Confirm) { New-Object System.Drawing.Size(430, 250) } else { New-Object System.Drawing.Size(430, 200) }
+    $dialog.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $dialog.MaximizeBox = $false
+    $dialog.MinimizeBox = $false
+    $dialog.TopMost = $true
+
+    $messageLabel = New-Object System.Windows.Forms.Label
+    $messageLabel.Text = $Message
+    $messageLabel.Location = New-Object System.Drawing.Point(18, 16)
+    $messageLabel.Size = New-Object System.Drawing.Size(380, 40)
+    $dialog.Controls.Add($messageLabel)
+
+    $passwordLabel = New-Object System.Windows.Forms.Label
+    $passwordLabel.Text = "Password"
+    $passwordLabel.Location = New-Object System.Drawing.Point(20, 66)
+    $passwordLabel.Size = New-Object System.Drawing.Size(120, 20)
+    $dialog.Controls.Add($passwordLabel)
+
+    $passwordBox = New-Object System.Windows.Forms.TextBox
+    $passwordBox.Location = New-Object System.Drawing.Point(20, 88)
+    $passwordBox.Size = New-Object System.Drawing.Size(380, 27)
+    $passwordBox.UseSystemPasswordChar = $true
+    $dialog.Controls.Add($passwordBox)
+
+    $confirmBox = $null
+    if ($Confirm) {
+        $confirmLabel = New-Object System.Windows.Forms.Label
+        $confirmLabel.Text = "Confirm Password"
+        $confirmLabel.Location = New-Object System.Drawing.Point(20, 122)
+        $confirmLabel.Size = New-Object System.Drawing.Size(140, 20)
+        $dialog.Controls.Add($confirmLabel)
+
+        $confirmBox = New-Object System.Windows.Forms.TextBox
+        $confirmBox.Location = New-Object System.Drawing.Point(20, 144)
+        $confirmBox.Size = New-Object System.Drawing.Size(380, 27)
+        $confirmBox.UseSystemPasswordChar = $true
+        $dialog.Controls.Add($confirmBox)
+    }
+
+    $okButton = New-Object System.Windows.Forms.Button
+    $okButton.Text = "OK"
+    $okButton.Location = if ($Confirm) { New-Object System.Drawing.Point(226, 182) } else { New-Object System.Drawing.Point(226, 124) }
+    $okButton.Size = New-Object System.Drawing.Size(82, 32)
+    $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $dialog.Controls.Add($okButton)
+
+    $cancelButton = New-Object System.Windows.Forms.Button
+    $cancelButton.Text = "Cancel"
+    $cancelButton.Location = if ($Confirm) { New-Object System.Drawing.Point(318, 182) } else { New-Object System.Drawing.Point(318, 124) }
+    $cancelButton.Size = New-Object System.Drawing.Size(82, 32)
+    $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $dialog.Controls.Add($cancelButton)
+
+    $dialog.AcceptButton = $okButton
+    $dialog.CancelButton = $cancelButton
+
+    $result = $dialog.ShowDialog()
+    if ($result -ne [System.Windows.Forms.DialogResult]::OK) {
+        $dialog.Dispose()
+        return $null
+    }
+
+    $response = [ordered]@{
+        password = $passwordBox.Text
+        confirm = if ($confirmBox) { $confirmBox.Text } else { $null }
+    }
+
+    $dialog.Dispose()
+    return $response
+}
+
+function Test-AdminConsolePasswordConfigured {
+    $section = $script:config["admin_console"]
+    return -not [string]::IsNullOrWhiteSpace([string]$section["password_hash"])
+}
+
+function Save-AdminConsoleConfigOnly {
+    Normalize-ConfigShape -ConfigObject $script:config
+    Write-JsonFile -Path $ConfigPath -ContentObject $script:config
+}
+
+function Set-AdminConsolePassword {
+    param(
+        [string]$PromptTitle,
+        [string]$PromptMessage
+    )
+
+    while ($true) {
+        $response = Show-PasswordPrompt -Title $PromptTitle -Message $PromptMessage -Confirm
+        if ($null -eq $response) {
+            return $false
+        }
+
+        $password = [string]$response["password"]
+        $confirm = [string]$response["confirm"]
+
+        if ($password.Length -lt 8) {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Admin console password must be at least 8 characters long.",
+                "AI Guard Agent",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning
+            ) | Out-Null
+            continue
+        }
+
+        if ($password -ne $confirm) {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Passwords do not match. Try again.",
+                "AI Guard Agent",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning
+            ) | Out-Null
+            continue
+        }
+
+        $salt = New-AdminConsoleSalt
+        $iterations = [int]$script:config["admin_console"]["password_iterations"]
+        $hash = Get-AdminConsolePasswordHash -Password $password -SaltBase64 $salt -Iterations $iterations
+        $script:config["admin_console"]["password_salt"] = $salt
+        $script:config["admin_console"]["password_hash"] = $hash
+        Save-AdminConsoleConfigOnly
+        return $true
+    }
+}
+
+function Confirm-AdminConsoleAccess {
+    if (-not (Test-AdminConsolePasswordConfigured)) {
+        $created = Set-AdminConsolePassword `
+            -PromptTitle "Set Admin Console Password" `
+            -PromptMessage "Create a password for AI Guard Agent Admin Console. This password will be required every time the console opens."
+        if (-not $created) {
+            return $false
+        }
+
+        [System.Windows.Forms.MessageBox]::Show(
+            "Admin console password has been set.",
+            "AI Guard Agent",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        ) | Out-Null
+        return $true
+    }
+
+    $storedHash = [string]$script:config["admin_console"]["password_hash"]
+    $storedSalt = [string]$script:config["admin_console"]["password_salt"]
+    $iterations = [int]$script:config["admin_console"]["password_iterations"]
+
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        $response = Show-PasswordPrompt `
+            -Title "Admin Console Password" `
+            -Message "Enter the AI Guard Agent Admin Console password."
+        if ($null -eq $response) {
+            return $false
+        }
+
+        $candidate = [string]$response["password"]
+        $candidateHash = Get-AdminConsolePasswordHash -Password $candidate -SaltBase64 $storedSalt -Iterations $iterations
+        if ($candidateHash -eq $storedHash) {
+            return $true
+        }
+
+        [System.Windows.Forms.MessageBox]::Show(
+            "Incorrect password.",
+            "AI Guard Agent",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        ) | Out-Null
+    }
+
+    return $false
+}
 function Normalize-Host {
     param(
         [string]$Value
@@ -309,11 +534,14 @@ if (-not (Test-IsAdministrator)) {
     return
 }
 
-$config = Read-Config
-Normalize-ConfigShape -ConfigObject $config
+$script:config = Read-Config
+Normalize-ConfigShape -ConfigObject $script:config
+if (-not (Confirm-AdminConsoleAccess)) {
+    return
+}
 
-if (-not $config.Contains("blocking")) {
-    $config["blocking"] = [ordered]@{
+if (-not $script:config.Contains("blocking")) {
+    $script:config["blocking"] = [ordered]@{
         browser_hosts = @()
         process_names = @()
         exempt_process_names = @()
@@ -380,7 +608,7 @@ $title.AutoSize = $true
 $form.Controls.Add($title)
 
 $subtitle = New-Object System.Windows.Forms.Label
-$subtitle.Text = "Only administrators can change blocked providers. Standard users remain read-only when AI Guard is machine-installed."
+$subtitle.Text = "Only administrators with the admin-console password can change blocked providers. Standard users remain read-only when AI Guard is machine-installed."
 $subtitle.Font = New-Object System.Drawing.Font("Segoe UI", 10)
 $subtitle.Location = New-Object System.Drawing.Point(22, 52)
 $subtitle.Size = New-Object System.Drawing.Size(920, 40)
@@ -489,18 +717,24 @@ $statusLabel = New-Object System.Windows.Forms.Label
 $statusLabel.Text = "Ready."
 $statusLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10)
 $statusLabel.Location = New-Object System.Drawing.Point(22, 532)
-$statusLabel.Size = New-Object System.Drawing.Size(700, 24)
+$statusLabel.Size = New-Object System.Drawing.Size(360, 24)
 $form.Controls.Add($statusLabel)
+
+$changePasswordButton = New-Object System.Windows.Forms.Button
+$changePasswordButton.Text = "Change Console Password"
+$changePasswordButton.Location = New-Object System.Drawing.Point(380, 548)
+$changePasswordButton.Size = New-Object System.Drawing.Size(170, 34)
+$form.Controls.Add($changePasswordButton)
 
 $reloadButton = New-Object System.Windows.Forms.Button
 $reloadButton.Text = "Reload"
-$reloadButton.Location = New-Object System.Drawing.Point(560, 548)
+$reloadButton.Location = New-Object System.Drawing.Point(564, 548)
 $reloadButton.Size = New-Object System.Drawing.Size(110, 34)
 $form.Controls.Add($reloadButton)
 
 $saveButton = New-Object System.Windows.Forms.Button
 $saveButton.Text = "Save and Apply"
-$saveButton.Location = New-Object System.Drawing.Point(684, 548)
+$saveButton.Location = New-Object System.Drawing.Point(688, 548)
 $saveButton.Size = New-Object System.Drawing.Size(144, 34)
 $form.Controls.Add($saveButton)
 
@@ -579,6 +813,21 @@ function Save-And-Apply {
     ) | Out-Null
 }
 
+function Change-AdminConsolePassword {
+    $changed = Set-AdminConsolePassword `
+        -PromptTitle "Change Admin Console Password" `
+        -PromptMessage "Enter a new password for AI Guard Agent Admin Console."
+    if ($changed) {
+        $statusLabel.Text = "Admin console password updated."
+        [System.Windows.Forms.MessageBox]::Show(
+            "Admin console password was updated successfully.",
+            "AI Guard Agent",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        ) | Out-Null
+    }
+}
+
 $webAddButton.Add_Click({ Add-HostFromInput })
 $webInput.Add_KeyDown({
     if ($_.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
@@ -604,6 +853,7 @@ $processRemoveButton.Add_Click({
 })
 
 $addPresetButton.Add_Click({ Add-PresetProvider })
+$changePasswordButton.Add_Click({ Change-AdminConsolePassword })
 $reloadButton.Add_Click({ Refresh-UiFromConfig })
 $saveButton.Add_Click({ Save-And-Apply })
 $closeButton.Add_Click({ $form.Close() })

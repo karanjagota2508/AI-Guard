@@ -170,6 +170,7 @@ The console lets an administrator:
 - Add or remove blocked desktop process names
 - Apply preset providers such as ChatGPT, Gemini, Perplexity, Grok, Cursor, Ollama, and LM Studio
 - Save the updated config and restart the AI Guard service
+- Set an admin-console password on first launch and require that password on every future launch
 
 Standard users cannot use this console without administrator approval. For enterprise rollout, keep the install under `C:\Program Files\AI Guard Agent` and do not grant end users local admin rights.
 
