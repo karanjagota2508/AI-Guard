@@ -18,6 +18,14 @@ if (-not (Test-IsAdministrator)) {
     throw "Run install-enterprise.ps1 from an Administrator PowerShell window."
 }
 
+if ($ExtensionUpdateUrl -and $ExtensionUpdateUrl -match 'your-company-host') {
+    throw "Replace the placeholder ExtensionUpdateUrl with a real HTTPS URL, or omit -ExtensionUpdateUrl to use the local daemon update endpoint."
+}
+
+if ($AllowedExtensionIds -contains 'your-corporate-extension-id') {
+    throw "Replace the placeholder AllowedExtensionIds value with real extension IDs, or omit -AllowedExtensionIds."
+}
+
 $installScript = Join-Path $PSScriptRoot "install.ps1"
 if (-not (Test-Path $installScript)) {
     throw "Missing install script at $installScript"

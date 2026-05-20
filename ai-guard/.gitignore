@@ -1,5 +1,7 @@
 daemon/target/
-installer/dist/
+installer/dist/*
+!installer/dist/ai-guard-daemon.exe
+!installer/dist/ai-guard-extension.crx
 logs/
 *.log
 installer/assets/extension-private-key.pem

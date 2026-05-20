@@ -214,6 +214,7 @@ $daemonProject = Join-Path $repoRoot "daemon"
 $daemonBinarySource = Join-Path $daemonProject "target\release\ai-guard-daemon.exe"
 $piiBackendSource = Join-Path (Split-Path $repoRoot -Parent) "PII_agent\backend"
 $distDir = Join-Path $repoRoot "installer\dist"
+$distDaemonBinary = Join-Path $distDir "ai-guard-daemon.exe"
 $distCrx = Join-Path $distDir "ai-guard-extension.crx"
 $token = New-RandomToken
 $serviceName = "AIGuardAgent"
@@ -225,11 +226,21 @@ Stop-LocalProcessByPort -Port 48555 -ExpectedProcessName "ai-guard-daemon"
 
 if (-not $SkipBuild) {
     cargo build --release --manifest-path (Join-Path $daemonProject "Cargo.toml")
+    New-Item -ItemType Directory -Force -Path $distDir | Out-Null
+    Copy-Item -Path $daemonBinarySource -Destination $distDaemonBinary -Force
     & (Join-Path $PSScriptRoot "scripts\package-extension.ps1") -OutputPath $distCrx
 }
 
-if (-not (Test-Path $daemonBinarySource)) {
-    throw "Missing daemon binary at $daemonBinarySource. Run without -SkipBuild or build it first."
+$daemonBinaryToInstall = $null
+foreach ($candidate in @($daemonBinarySource, $distDaemonBinary)) {
+    if ($candidate -and (Test-Path $candidate)) {
+        $daemonBinaryToInstall = $candidate
+        break
+    }
+}
+
+if (-not $daemonBinaryToInstall) {
+    throw "Missing daemon binary. Expected either $daemonBinarySource or $distDaemonBinary. Run without -SkipBuild on a build machine first, or copy a prebuilt daemon binary into installer\\dist\\ai-guard-daemon.exe."
 }
 
 if (-not (Test-Path $distCrx)) {
@@ -266,7 +277,7 @@ $startMenuPrograms = if ($isAdmin) {
 $adminConsoleShortcut = Join-Path $startMenuPrograms "AI Guard Agent Admin Console.lnk"
 
 New-Item -ItemType Directory -Force -Path $InstallRoot, $installConfigDir, $installDistDir, $installLogsDir, $installManifestDir, $installPiiDir, $installScriptsDir, $installDesktopDir | Out-Null
-Copy-Item -Path $daemonBinarySource -Destination $installedBinary -Force
+Copy-Item -Path $daemonBinaryToInstall -Destination $installedBinary -Force
 Copy-Item -Path $distCrx -Destination $installedCrx -Force
 Copy-Item -Path (Join-Path $PSScriptRoot "scripts\patch-claude-desktop.ps1") -Destination $patchClaudeDesktopScript -Force
 Copy-Item -Path (Join-Path $PSScriptRoot "scripts\sync-claude-store-runtime.ps1") -Destination $syncClaudeStoreRuntimeScript -Force

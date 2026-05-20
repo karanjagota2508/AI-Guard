@@ -104,6 +104,15 @@ For a stronger managed-browser rollout, use:
   -DisableBrowserDeveloperTools
 ```
 
+For offline or repeated installs on other PCs:
+
+1. Run the installer once on a build machine without `-SkipBuild`.
+2. This will populate `installer/dist/ai-guard-daemon.exe` and `installer/dist/ai-guard-extension.crx`.
+3. Copy the full `ai-guard/` and `PII_agent/` folders to the target PC.
+4. On the target PC, run the installer with `-SkipBuild`.
+
+Do not leave placeholder values like `https://your-company-host/...` in the command. Omit `-ExtensionUpdateUrl` to use the local daemon update endpoint, or replace it with a real reachable HTTPS URL.
+
 The installer:
 
 - Builds the daemon release binary
