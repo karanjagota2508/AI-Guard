@@ -1,0 +1,71 @@
+{
+  "listen_address": "127.0.0.1:48555",
+  "auth_token": "replace-at-install-time",
+  "pii_engine_url": "http://127.0.0.1:8000/api/pii/detect",
+  "pii_anonymize_url": "http://127.0.0.1:8000/api/pii/anonymize",
+  "managed_pii": {
+    "enabled": true,
+    "executable": "python",
+    "args": [
+      "main.py"
+    ],
+    "working_directory": "../../PII_agent/backend",
+    "health_url": "http://127.0.0.1:8000/health",
+    "startup_timeout_ms": 120000,
+    "restart_delay_ms": 5000,
+    "env": {
+      "HOST": "127.0.0.1",
+      "PORT": "8000",
+      "PII_SERVICE_RELOAD": "false",
+      "PII_SERVICE_CORS_ORIGINS": "http://127.0.0.1,http://localhost"
+    },
+    "stdout_log_path": "../logs/pii-agent.stdout.log",
+    "stderr_log_path": "../logs/pii-agent.stderr.log"
+  },
+  "scan_timeout_ms": 3500,
+  "fail_closed": true,
+  "browser_heartbeat_ttl_ms": 8000,
+  "desktop_activity_ttl_ms": 5000,
+  "process_poll_ms": 2000,
+  "extension_ids": [
+    "kgfkgellcbbmadimiahbfndmfbhfobko"
+  ],
+  "claude": {
+    "web_hosts": [
+      "claude.ai"
+    ],
+    "desktop_processes": [
+      "claude"
+    ]
+  },
+  "blocking": {
+    "browser_hosts": [
+      "chatgpt.com",
+      "chat.openai.com",
+      "gemini.google.com",
+      "perplexity.ai"
+    ],
+    "process_names": [
+      "ChatGPT",
+      "Cursor",
+      "Ollama",
+      "LM Studio",
+      "OpenWebUI",
+      "AnythingLLM",
+      "Jan"
+    ],
+    "exempt_process_names": [
+      "ai-guard-daemon",
+      "msedge",
+      "chrome"
+    ]
+  },
+  "package": {
+    "extension_id": "kgfkgellcbbmadimiahbfndmfbhfobko",
+    "extension_version": "1.0.0",
+    "extension_crx_path": "../installer/dist/ai-guard-extension.crx"
+  },
+  "logging": {
+    "directory": "../logs"
+  }
+}

@@ -1,0 +1,31 @@
+[package]
+name = "ai-guard-daemon"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0"
+axum = "0.8"
+clap = { version = "4.5", features = ["derive"] }
+http = "1.3"
+once_cell = "1.21"
+parking_lot = "0.12"
+regex = "1.12"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sysinfo = "0.37"
+tokio = { version = "1.48", features = ["macros", "rt-multi-thread", "signal", "time", "fs", "net", "process"] }
+tokio-util = "0.7"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
+] }
+windows-service = "0.8"

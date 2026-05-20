@@ -1,0 +1,38 @@
+{
+  "scan_request": {
+    "text": "string"
+  },
+  "scan_response": {
+    "action": "allow|block|redact",
+    "redacted_text": "string",
+    "reason": "string"
+  },
+  "activity_request": {
+    "page_url": "string",
+    "tab_visible": true
+  },
+  "status_response": {
+    "mode": "idle|active",
+    "active_sources": [
+      "claude_web",
+      "claude_desktop"
+    ],
+    "blocked_hosts": [
+      "chatgpt.com",
+      "gemini.google.com",
+      "perplexity.ai"
+    ]
+  },
+  "native_bootstrap_response": {
+    "type": "hello",
+    "token": "string",
+    "base_url": "http://127.0.0.1:48555",
+    "extension_id": "kgfkgellcbbmadimiahbfndmfbhfobko",
+    "mode": "idle|active",
+    "blocked_hosts": [
+      "chatgpt.com",
+      "gemini.google.com",
+      "perplexity.ai"
+    ]
+  }
+}
