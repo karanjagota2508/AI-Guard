@@ -1,5 +1,5 @@
-daemon/target/
-installer/dist/
-logs/
+tmp/
+*.pyc
+__pycache__/
+.venv/
 *.log
-installer/assets/extension-private-key.pem

@@ -1,0 +1,5 @@
+daemon/target/
+installer/dist/
+logs/
+*.log
+installer/assets/extension-private-key.pem
