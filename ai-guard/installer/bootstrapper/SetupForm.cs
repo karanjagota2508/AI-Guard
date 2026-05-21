@@ -52,7 +52,7 @@ internal sealed class SetupForm : Form
 
         _warningLabel = new Label
         {
-            Text = BuildWarningText(),
+            Text = "This setup will request administrator approval and then perform a machine-wide install. It bundles its own local runtime and does not require command-line steps from the end user.",
             Font = new System.Drawing.Font("Segoe UI", 9),
             ForeColor = System.Drawing.Color.FromArgb(120, 84, 0),
             BackColor = System.Drawing.Color.FromArgb(255, 243, 205),
@@ -137,16 +137,6 @@ internal sealed class SetupForm : Form
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
             "AI Guard Agent");
         return Directory.Exists(installRoot);
-    }
-
-    private string BuildWarningText()
-    {
-        if (IsPythonAvailable())
-        {
-            return "This installer will request administrator approval and then perform a machine-wide install. Restart Chrome, Edge, and Claude Desktop after setup if they were already open.";
-        }
-
-        return "Warning: Python 3 was not detected on this PC. The bundled PII agent provisioning currently depends on Python. Install Python first or use a company image that already includes it.";
     }
 
     private async Task RunInstallAsync()
@@ -299,39 +289,6 @@ internal sealed class SetupForm : Form
         using var archive = new ZipArchive(payloadStream, ZipArchiveMode.Read);
         archive.ExtractToDirectory(extractionRoot, overwriteFiles: true);
         return extractionRoot;
-    }
-
-    private static bool IsPythonAvailable()
-    {
-        return CanRunCommand("py", "-3 --version") || CanRunCommand("python", "--version");
-    }
-
-    private static bool CanRunCommand(string fileName, string arguments)
-    {
-        try
-        {
-            using var process = Process.Start(new ProcessStartInfo
-            {
-                FileName = fileName,
-                Arguments = arguments,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            });
-
-            if (process is null)
-            {
-                return false;
-            }
-
-            process.WaitForExit(5000);
-            return process.ExitCode == 0;
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     private void SetButtonsEnabled(bool enabled)

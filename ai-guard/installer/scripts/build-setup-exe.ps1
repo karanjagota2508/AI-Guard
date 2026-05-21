@@ -89,6 +89,9 @@ if (-not (Test-Path (Join-Path $installerRoot "dist\ai-guard-extension.crx"))) {
     throw "Missing packaged extension at installer\dist\ai-guard-extension.crx. Build or copy it first."
 }
 
+& (Join-Path $PSScriptRoot "build-python-runtime.ps1")
+& (Join-Path $PSScriptRoot "build-pii-wheelhouse.ps1")
+
 try {
     if (Test-Path $payloadZip) {
         Remove-Item -Path $payloadZip -Force

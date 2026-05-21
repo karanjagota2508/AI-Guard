@@ -3,6 +3,8 @@ installer/dist/*
 !installer/dist/ai-guard-daemon.exe
 !installer/dist/ai-guard-extension.crx
 !installer/dist/AI-Guard-Setup.exe
+installer/dist/python-runtime/
+installer/dist/pii-wheelhouse/
 installer/bootstrapper/bin/
 installer/bootstrapper/obj/
 installer/bootstrapper/payload.zip

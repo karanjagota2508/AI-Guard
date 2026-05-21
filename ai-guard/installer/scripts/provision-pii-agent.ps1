@@ -1,7 +1,8 @@
 param(
     [string]$SourceBackendDir,
     [string]$InstallDir,
-    [string]$PythonExecutable
+    [string]$PythonExecutable,
+    [string]$WheelhousePath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,14 +35,24 @@ if (-not (Test-Path $venvPython)) {
     }
 }
 
-$null = & $venvPython -m pip install --upgrade pip setuptools wheel
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to upgrade pip tooling for the PII agent."
-}
+$requirementsPath = Join-Path $backendInstallDir "requirements.txt"
+$hasWheelhouse = $WheelhousePath -and (Test-Path $WheelhousePath) -and (Get-ChildItem -Path $WheelhousePath -File -ErrorAction SilentlyContinue | Select-Object -First 1)
 
-$null = & $venvPython -m pip install -r (Join-Path $backendInstallDir "requirements.txt")
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to install PII agent dependencies."
+if ($hasWheelhouse) {
+    $null = & $venvPython -m pip install --no-index --find-links $WheelhousePath -r $requirementsPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install PII agent dependencies from bundled wheelhouse."
+    }
+} else {
+    $null = & $venvPython -m pip install --upgrade pip setuptools wheel
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to upgrade pip tooling for the PII agent."
+    }
+
+    $null = & $venvPython -m pip install -r $requirementsPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install PII agent dependencies."
+    }
 }
 
 Write-Output $venvPython

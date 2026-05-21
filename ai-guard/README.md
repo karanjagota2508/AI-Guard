@@ -128,6 +128,8 @@ The setup executable:
 - requests administrator approval automatically
 - shows a simple Install / Repair / Uninstall GUI
 - extracts the bundled AI Guard + PII payload to a temporary folder
+- bundles a private Python runtime for the managed PII backend
+- can bundle a local wheelhouse so the PII backend provisions without preinstalled Python or manual pip commands
 - runs `install-enterprise.ps1 -SkipBuild` internally
 - does not require the operator to type any PowerShell commands
 

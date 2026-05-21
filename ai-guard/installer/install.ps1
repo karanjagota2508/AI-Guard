@@ -220,7 +220,9 @@ $token = New-RandomToken
 $serviceName = "AIGuardAgent"
 $extensionId = "kgfkgellcbbmadimiahbfndmfbhfobko"
 $origin = "chrome-extension://$extensionId/"
-$pythonExecutable = Find-PythonExecutable
+$bundledPythonExecutable = Join-Path $distDir "python-runtime\python.exe"
+$wheelhouseDir = Join-Path $distDir "pii-wheelhouse"
+$pythonExecutable = if (Test-Path $bundledPythonExecutable) { $bundledPythonExecutable } else { Find-PythonExecutable }
 
 Stop-LocalProcessByPort -Port 48555 -ExpectedProcessName "ai-guard-daemon"
 
@@ -294,7 +296,8 @@ Copy-Item -Path (Join-Path $repoRoot "extension\\*") -Destination $installedExte
 $venvPython = @(& (Join-Path $PSScriptRoot "scripts\provision-pii-agent.ps1") `
     -SourceBackendDir $piiBackendSource `
     -InstallDir $installPiiDir `
-    -PythonExecutable $pythonExecutable)
+    -PythonExecutable $pythonExecutable `
+    -WheelhousePath $wheelhouseDir)
 $venvPython = ($venvPython | Select-Object -Last 1).Trim()
 
 & (Join-Path $PSScriptRoot "scripts\write-config.ps1") `
