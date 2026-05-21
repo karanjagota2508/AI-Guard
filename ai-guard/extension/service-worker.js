@@ -1,4 +1,7 @@
 const NATIVE_HOST = "com.wininfosoft.ai_guard";
+const CLAUDE_HOSTS = ["claude.ai"];
+const STATUS_CACHE_TTL_MS = 2000;
+const CLAUDE_PRESENCE_CACHE_TTL_MS = 1000;
 
 const daemonState = {
   baseUrl: "http://127.0.0.1:48555",
@@ -12,19 +15,25 @@ const daemonState = {
   mode: "idle",
   activeSources: [],
   lastStatusAt: 0,
+  lastClaudePresenceAt: 0,
 };
 
+let claudePresencePromise = null;
+
 bootstrap()
-  .then(() => refreshStatus(true))
-  .then(() => auditExistingTabs())
+  .then(() => auditExistingTabs({ forcePresenceSync: true }))
   .catch(console.error);
 
 chrome.runtime.onInstalled.addListener(() => {
-  bootstrap().then(auditExistingTabs).catch(console.error);
+  bootstrap()
+    .then(() => auditExistingTabs({ forcePresenceSync: true }))
+    .catch(console.error);
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  bootstrap().then(auditExistingTabs).catch(console.error);
+  bootstrap()
+    .then(() => auditExistingTabs({ forcePresenceSync: true }))
+    .catch(console.error);
 });
 
 chrome.tabs.onCreated.addListener((tab) => {
@@ -56,6 +65,10 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   }
 });
 
+chrome.tabs.onRemoved.addListener(() => {
+  syncClaudePresence({ force: true }).catch(console.error);
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || !message.type) {
     return false;
@@ -78,15 +91,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === "activity") {
-    daemonFetch("/extension/activity", {
-      method: "POST",
-      body: {
-        page_url: message.pageUrl || "",
-        tab_visible: Boolean(message.tabVisible),
-      },
-    })
-      .then((status) => {
-        applyStatus(status);
+    syncClaudePresence({ force: true })
+      .then(() => {
         if (daemonState.mode === "active") {
           auditExistingTabs().catch(console.error);
         }
@@ -180,7 +186,7 @@ async function retryDaemonFetch(path, options, originalError) {
 
 async function refreshStatus(force = false) {
   const ageMs = Date.now() - daemonState.lastStatusAt;
-  if (!force && ageMs < 2000) {
+  if (!force && ageMs < STATUS_CACHE_TTL_MS) {
     return snapshot();
   }
 
@@ -192,6 +198,56 @@ async function refreshStatus(force = false) {
   }
 
   return snapshot();
+}
+
+async function syncClaudePresence({ force = false } = {}) {
+  const ageMs = Date.now() - daemonState.lastClaudePresenceAt;
+  if (!force && ageMs < CLAUDE_PRESENCE_CACHE_TTL_MS) {
+    return snapshot();
+  }
+
+  if (claudePresencePromise) {
+    return claudePresencePromise;
+  }
+
+  claudePresencePromise = (async () => {
+    const tabs = await chrome.tabs.query({});
+    const claudeTabs = tabs.filter((tab) => isClaudeUrl(tab.pendingUrl || tab.url));
+    const hasClaudeTabs = claudeTabs.length > 0;
+    const pageUrl =
+      claudeTabs.find((tab) => tab.active)?.pendingUrl ||
+      claudeTabs.find((tab) => tab.active)?.url ||
+      claudeTabs[0]?.pendingUrl ||
+      claudeTabs[0]?.url ||
+      "https://claude.ai/";
+
+    daemonState.lastClaudePresenceAt = Date.now();
+
+    if (!force && !hasClaudeTabs && daemonState.mode === "idle") {
+      return snapshot();
+    }
+
+    try {
+      const status = await daemonFetch("/extension/activity", {
+        method: "POST",
+        body: {
+          page_url: pageUrl,
+          tab_visible: hasClaudeTabs,
+        },
+      });
+      applyStatus(status);
+    } catch (error) {
+      console.warn("AI Guard Claude presence sync failed", error);
+    }
+
+    return snapshot();
+  })();
+
+  try {
+    return await claudePresencePromise;
+  } finally {
+    claudePresencePromise = null;
+  }
 }
 
 function applyStatus(status) {
@@ -222,7 +278,12 @@ async function evaluateTab(tabId, url) {
     return;
   }
 
-  const status = await refreshStatus(false);
+  await syncClaudePresence();
+  const status = await refreshStatus(isClaudeUrl(url));
+  if (isClaudeUrl(url)) {
+    return;
+  }
+
   if (status.mode !== "active") {
     return;
   }
@@ -236,7 +297,10 @@ async function evaluateTab(tabId, url) {
   });
 }
 
-async function auditExistingTabs() {
+async function auditExistingTabs({ forcePresenceSync = false } = {}) {
+  if (forcePresenceSync) {
+    await syncClaudePresence({ force: true });
+  }
   const tabs = await chrome.tabs.query({});
   for (const tab of tabs) {
     if (tab.id && tab.url) {
@@ -246,15 +310,36 @@ async function auditExistingTabs() {
 }
 
 function matchesBlockedHost(url) {
-  try {
-    const hostname = new URL(url).hostname.toLowerCase();
-    return daemonState.blockedHosts.some((blockedHost) => {
-      const normalized = blockedHost.toLowerCase();
-      return hostname === normalized || hostname.endsWith(`.${normalized}`);
-    });
-  } catch (_error) {
+  const hostname = hostnameForUrl(url);
+  if (!hostname) {
     return false;
   }
+
+  return matchesHost(hostname, daemonState.blockedHosts);
+}
+
+function isClaudeUrl(url) {
+  const hostname = hostnameForUrl(url);
+  if (!hostname) {
+    return false;
+  }
+
+  return matchesHost(hostname, CLAUDE_HOSTS);
+}
+
+function hostnameForUrl(url) {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch (_error) {
+    return null;
+  }
+}
+
+function matchesHost(hostname, candidates) {
+  return candidates.some((candidate) => {
+    const normalized = String(candidate || "").toLowerCase();
+    return hostname === normalized || hostname.endsWith(`.${normalized}`);
+  });
 }
 
 function blockedPageUrl(originalUrl) {

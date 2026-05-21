@@ -70,7 +70,7 @@ $config = @{
     }
     package = @{
         extension_id = "kgfkgellcbbmadimiahbfndmfbhfobko"
-        extension_version = "1.0.0"
+        extension_version = "1.0.1"
         extension_crx_path = $ExtensionCrxPath
     }
     logging = @{
