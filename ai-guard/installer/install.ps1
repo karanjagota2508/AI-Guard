@@ -274,6 +274,7 @@ $piiStderrLog = Join-Path $installLogsDir "pii-agent.stderr.log"
 $patchClaudeDesktopScript = Join-Path $installScriptsDir "patch-claude-desktop.ps1"
 $syncClaudeStoreRuntimeScript = Join-Path $installScriptsDir "sync-claude-store-runtime.ps1"
 $adminConsoleScript = Join-Path $installScriptsDir "admin-console.ps1"
+$browserPoliciesScript = Join-Path $installScriptsDir "browser-policies.ps1"
 $installedClaudeHook = Join-Path $installDesktopDir "claude-desktop-hook.cjs"
 $installedClaudeUiaGuard = Join-Path $installDesktopDir "claude-desktop-uia-guard.ps1"
 $claudeLauncherScript = Join-Path $InstallRoot "launch-claude-desktop.ps1"
@@ -291,6 +292,7 @@ Copy-Item -Path $distCrx -Destination $installedCrx -Force
 Copy-Item -Path (Join-Path $PSScriptRoot "scripts\patch-claude-desktop.ps1") -Destination $patchClaudeDesktopScript -Force
 Copy-Item -Path (Join-Path $PSScriptRoot "scripts\sync-claude-store-runtime.ps1") -Destination $syncClaudeStoreRuntimeScript -Force
 Copy-Item -Path (Join-Path $PSScriptRoot "scripts\admin-console.ps1") -Destination $adminConsoleScript -Force
+Copy-Item -Path (Join-Path $PSScriptRoot "scripts\browser-policies.ps1") -Destination $browserPoliciesScript -Force
 Copy-Item -Path (Join-Path $repoRoot "desktop\claude-desktop-hook.cjs") -Destination $installedClaudeHook -Force
 Copy-Item -Path (Join-Path $repoRoot "desktop\claude-desktop-uia-guard.ps1") -Destination $installedClaudeUiaGuard -Force
 $installedExtensionDir = Join-Path $InstallRoot "extension"
