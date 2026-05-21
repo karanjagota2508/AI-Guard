@@ -1,6 +1,7 @@
 param(
     [string]$OutputPath = (Join-Path (Split-Path $PSScriptRoot -Parent) "dist\AI-Guard-Setup.exe"),
-    [string]$Runtime = "win-x64"
+    [string]$Runtime = "win-x64",
+    [switch]$IncludeWheelhouse
 )
 
 $ErrorActionPreference = "Stop"
@@ -90,7 +91,9 @@ if (-not (Test-Path (Join-Path $installerRoot "dist\ai-guard-extension.crx"))) {
 }
 
 & (Join-Path $PSScriptRoot "build-python-runtime.ps1")
-& (Join-Path $PSScriptRoot "build-pii-wheelhouse.ps1")
+if ($IncludeWheelhouse) {
+    & (Join-Path $PSScriptRoot "build-pii-wheelhouse.ps1")
+}
 
 try {
     if (Test-Path $payloadZip) {
@@ -106,7 +109,10 @@ try {
     Copy-DirectoryFiltered -Source (Join-Path $repoRoot "desktop") -Destination (Join-Path $stageAiGuardRoot "desktop")
     Copy-DirectoryFiltered -Source (Join-Path $repoRoot "extension") -Destination (Join-Path $stageAiGuardRoot "extension")
     Copy-DirectoryFiltered -Source (Join-Path $installerRoot "scripts") -Destination (Join-Path $stageInstallerRoot "scripts")
-    Copy-DirectoryFiltered -Source (Join-Path $installerRoot "dist") -Destination (Join-Path $stageInstallerRoot "dist")
+    Copy-DirectoryFiltered `
+        -Source (Join-Path $installerRoot "dist") `
+        -Destination (Join-Path $stageInstallerRoot "dist") `
+        -ExcludedDirectoryNames $(if ($IncludeWheelhouse) { @() } else { @("pii-wheelhouse") })
 
     Copy-FileEnsureParent -Source (Join-Path $installerRoot "install.ps1") -Destination (Join-Path $stageInstallerRoot "install.ps1")
     Copy-FileEnsureParent -Source (Join-Path $installerRoot "install-enterprise.ps1") -Destination (Join-Path $stageInstallerRoot "install-enterprise.ps1")

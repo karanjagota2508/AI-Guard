@@ -166,7 +166,12 @@ function Normalize-ConfigShape {
 
 function New-AdminConsoleSalt {
     $bytes = New-Object byte[] 16
-    [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $rng.GetBytes($bytes)
+    } finally {
+        $rng.Dispose()
+    }
     return [Convert]::ToBase64String($bytes)
 }
 
@@ -178,12 +183,20 @@ function Get-AdminConsolePasswordHash {
     )
 
     $salt = [Convert]::FromBase64String($SaltBase64)
-    $deriveBytes = New-Object System.Security.Cryptography.Rfc2898DeriveBytes(
-        $Password,
-        $salt,
-        $Iterations,
-        [System.Security.Cryptography.HashAlgorithmName]::SHA256
-    )
+    try {
+        $deriveBytes = New-Object System.Security.Cryptography.Rfc2898DeriveBytes(
+            $Password,
+            $salt,
+            $Iterations,
+            [System.Security.Cryptography.HashAlgorithmName]::SHA256
+        )
+    } catch {
+        $deriveBytes = New-Object System.Security.Cryptography.Rfc2898DeriveBytes(
+            $Password,
+            $salt,
+            $Iterations
+        )
+    }
 
     try {
         $hashBytes = $deriveBytes.GetBytes(32)

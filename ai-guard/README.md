@@ -119,6 +119,12 @@ If you want a no-command setup for end users or IT operators, build the single-f
 .\installer\scripts\build-setup-exe.ps1
 ```
 
+To build the larger fully offline setup that also bundles the PII dependency wheelhouse:
+
+```powershell
+.\installer\scripts\build-setup-exe.ps1 -IncludeWheelhouse -OutputPath .\artifacts\AI-Guard-Setup-offline.exe
+```
+
 That produces:
 
 - `installer/dist/AI-Guard-Setup.exe`
@@ -129,7 +135,7 @@ The setup executable:
 - shows a simple Install / Repair / Uninstall GUI
 - extracts the bundled AI Guard + PII payload to a temporary folder
 - bundles a private Python runtime for the managed PII backend
-- can bundle a local wheelhouse so the PII backend provisions without preinstalled Python or manual pip commands
+- can optionally bundle a local wheelhouse so the PII backend provisions fully offline
 - runs `install-enterprise.ps1 -SkipBuild` internally
 - does not require the operator to type any PowerShell commands
 
