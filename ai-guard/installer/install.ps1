@@ -7,6 +7,8 @@ param(
     [switch]$BlockOtherExtensions,
     [string[]]$AllowedExtensionIds = @(),
     [switch]$RequirePrivateBrowsingGuard,
+    [switch]$EnforceBrowserHostBlocklist,
+    [switch]$DisablePrivateBrowsing,
     [switch]$DisallowExtensionDeveloperMode,
     [switch]$DisableBrowserDeveloperTools
 )
@@ -316,6 +318,8 @@ $venvPython = ($venvPython | Select-Object -Last 1).Trim()
     -PiiStdoutLogPath $piiStdoutLog `
     -PiiStderrLogPath $piiStderrLog
 
+$effectiveConfig = Get-Content -Path $installedConfig -Raw | ConvertFrom-Json
+
 & $patchClaudeDesktopScript `
     -ConfigPath $installedConfig `
     -HookSourcePath $installedClaudeHook
@@ -364,6 +368,20 @@ if ($isAdmin) {
         -DisallowExtensionDeveloperMode:$DisallowExtensionDeveloperMode `
         -DisableDeveloperTools:$DisableBrowserDeveloperTools
 
+    if ($EnforceBrowserHostBlocklist) {
+        Set-AIGuardBrowserHostBlocklistPolicy `
+            -Hive $registryHive `
+            -Browser "Chrome" `
+            -Hosts @($effectiveConfig.blocking.browser_hosts)
+    }
+
+    if ($DisablePrivateBrowsing) {
+        Set-AIGuardPrivateBrowsingPolicy `
+            -Hive $registryHive `
+            -Browser "Chrome" `
+            -Disable
+    }
+
     Set-ManagedExtensionPolicy `
         -Hive $registryHive `
         -Browser "Edge" `
@@ -375,6 +393,20 @@ if ($isAdmin) {
         -RequirePrivateBrowsingGuard:$RequirePrivateBrowsingGuard `
         -DisallowExtensionDeveloperMode:$DisallowExtensionDeveloperMode `
         -DisableDeveloperTools:$DisableBrowserDeveloperTools
+
+    if ($EnforceBrowserHostBlocklist) {
+        Set-AIGuardBrowserHostBlocklistPolicy `
+            -Hive $registryHive `
+            -Browser "Edge" `
+            -Hosts @($effectiveConfig.blocking.browser_hosts)
+    }
+
+    if ($DisablePrivateBrowsing) {
+        Set-AIGuardPrivateBrowsingPolicy `
+            -Hive $registryHive `
+            -Browser "Edge" `
+            -Disable
+    }
 }
 
 Stop-LocalProcessByPort -Port 48555 -ExpectedProcessName "ai-guard-daemon"
@@ -439,6 +471,12 @@ Write-Host "PII Health   : $($piiHealth.Content)"
 Write-Host ""
 if ($isAdmin) {
     Write-Host "Restart Chrome and Edge, then verify the extension is present and managed."
+    if ($EnforceBrowserHostBlocklist) {
+        Write-Host "Blocked provider hosts are also enforced through Chrome/Edge URLBlocklist policy."
+    }
+    if ($DisablePrivateBrowsing) {
+        Write-Host "Chrome Incognito and Edge InPrivate were disabled to prevent users bypassing managed protections."
+    }
 } else {
     Write-Host "Current-user install does not force-enable the extension. Load the installed extension folder unpacked in Chrome/Edge:"
     Write-Host "  $installedExtensionDir"

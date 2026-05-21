@@ -10,6 +10,8 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+. (Join-Path $PSScriptRoot "browser-policies.ps1")
+
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -535,6 +537,24 @@ function Restart-AIGuardRuntime {
     return "Config saved. Restart AI Guard manually."
 }
 
+function Get-PolicyRegistryHive {
+    if ($ConfigPath -and $ConfigPath.StartsWith($env:ProgramFiles, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return [Microsoft.Win32.RegistryHive]::LocalMachine
+    }
+
+    return [Microsoft.Win32.RegistryHive]::CurrentUser
+}
+
+function Apply-BrowserPoliciesFromConfig {
+    $hive = Get-PolicyRegistryHive
+    $hosts = @($script:config.blocking.browser_hosts)
+
+    Set-AIGuardBrowserHostBlocklistPolicy -Hive $hive -Browser "Chrome" -Hosts $hosts
+    Set-AIGuardBrowserHostBlocklistPolicy -Hive $hive -Browser "Edge" -Hosts $hosts
+    Set-AIGuardPrivateBrowsingPolicy -Hive $hive -Browser "Chrome" -Disable
+    Set-AIGuardPrivateBrowsingPolicy -Hive $hive -Browser "Edge" -Disable
+}
+
 if (-not $ConfigPath) {
     $candidate = Join-Path ${env:ProgramFiles} "AI Guard Agent\config\ai-guard.json"
     if (Test-Path $candidate) {
@@ -816,10 +836,11 @@ function Save-And-Apply {
     $script:config.blocking.process_names = Get-ListBoxValues -ListBox $processList
     Normalize-ConfigShape -ConfigObject $script:config
     Write-JsonFile -Path $ConfigPath -ContentObject $script:config
+    Apply-BrowserPoliciesFromConfig
     $result = Restart-AIGuardRuntime
     $statusLabel.Text = "Saved. $result"
     [System.Windows.Forms.MessageBox]::Show(
-        "Provider settings were saved successfully.`r`n`r`n$result",
+        "Provider settings were saved successfully.`r`n`r`nBrowser URL block policy was updated and private browsing remains disabled by policy.`r`n`r`n$result",
         "AI Guard Agent",
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Information

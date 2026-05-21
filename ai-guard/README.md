@@ -42,7 +42,7 @@ ai-guard/
 - Enforce prompt scanning in Store/MSIX Claude Desktop builds without modifying the protected `WindowsApps` package in place.
 - Run a fully local PII pipeline with Presidio-based detection and anonymization.
 - Force-install the browser extension for Chrome and Edge through policy.
-- Support Claude web protection in Chrome Incognito and Edge InPrivate windows when the browser allows the extension there.
+- Permanently block configured competing provider websites through Chrome and Edge browser policy, not only through extension tab interception.
 - Deploy one install under `C:\Program Files\AI Guard Agent` instead of managing separate pieces manually.
 - Let administrators manage blocked providers through a local desktop admin console instead of editing JSON manually.
 
@@ -153,7 +153,8 @@ The installer:
 - Registers Chrome and Edge native messaging manifests
 - Applies Chrome and Edge managed extension policies without overwriting unrelated org policy entries
 - Registers both `ExtensionSettings` and `ExtensionInstallForcelist` entries for the fixed extension ID
-- Can optionally register Chrome `MandatoryExtensionsForIncognitoNavigation` and Edge `MandatoryExtensionsForInPrivateNavigation` so users must allow AI Guard before they can browse privately
+- Can enforce blocked provider domains through Chrome and Edge `URLBlocklist`
+- Can disable Chrome Incognito and Edge InPrivate entirely so users cannot bypass AI Guard from private windows
 - Can optionally block other extensions, disable extensions-page developer mode, and disable browser developer tools
 
 Restart Chrome and Edge after installation so policy refresh and extension installation happen immediately.
@@ -208,16 +209,17 @@ Recommended hardening switches:
 - `-DisableBrowserDeveloperTools` disables built-in browser developer tools entirely.
 - `-MinimumExtensionVersion` enforces a minimum AI Guard extension version.
 - `-ExtensionUpdateUrl` lets you point the force-install policy at a central HTTPS update manifest instead of `127.0.0.1`.
-- `-RequirePrivateBrowsingGuard` registers AI Guard as mandatory for Chrome Incognito and Edge InPrivate navigation.
+- `-EnforceBrowserHostBlocklist` writes the configured provider host list into Chrome and Edge `URLBlocklist`.
+- `-DisablePrivateBrowsing` disables Chrome Incognito and Edge InPrivate entirely.
 
 Operational guidance:
 
 - For company rollout, prefer a central HTTPS-hosted `update.xml` and `.crx`, or publish the same fixed-ID package to the Chrome Web Store and Edge Add-ons.
 - The installer now merges AI Guard policy into existing `ExtensionSettings` rather than overwriting the whole organization policy blob.
 - Uninstall removes only AI Guard's managed-extension entries and preserves unrelated extension policies.
-- The extension manifest is configured with `"incognito": "split"` so `blocked.html` and content-script enforcement can operate in private browsing contexts when the browser allows the extension there.
-- Chrome still doesn't let admins silently flip `Allow in Incognito`; managed rollout can only force the user prompt before Incognito browsing, or disable Incognito entirely.
-- Edge similarly does not let admins directly enable `Allow in InPrivate`, but recent Edge supports `MandatoryExtensionsForInPrivateNavigation` to require user approval before private navigation.
+- The extension manifest remains configured with `"incognito": "split"`, but enterprise install now uses browser policy for stronger enforcement: blocked provider sites are denied by `URLBlocklist`, and private browsing can be disabled entirely.
+- Chrome still doesn't let admins silently make `Allow in Incognito` read-only and enabled for a force-installed extension.
+- Edge similarly does not expose a supported policy to force `Allow in InPrivate` on and read-only for a force-installed extension.
 
 ## Operational notes
 

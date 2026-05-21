@@ -34,7 +34,8 @@ if (-not (Test-Path $installScript)) {
 $params = @{
     PiiPort                        = $PiiPort
     BlockOtherExtensions          = $true
-    RequirePrivateBrowsingGuard   = $true
+    EnforceBrowserHostBlocklist   = $true
+    DisablePrivateBrowsing        = $true
     DisallowExtensionDeveloperMode = $true
     DisableBrowserDeveloperTools  = $true
 }
