@@ -380,6 +380,10 @@ if ($isAdmin) {
             -Hive $registryHive `
             -Browser "Chrome" `
             -Disable
+    } else {
+        Set-AIGuardPrivateBrowsingPolicy `
+            -Hive $registryHive `
+            -Browser "Chrome"
     }
 
     Set-ManagedExtensionPolicy `
@@ -406,6 +410,10 @@ if ($isAdmin) {
             -Hive $registryHive `
             -Browser "Edge" `
             -Disable
+    } else {
+        Set-AIGuardPrivateBrowsingPolicy `
+            -Hive $registryHive `
+            -Browser "Edge"
     }
 }
 
@@ -476,6 +484,8 @@ if ($isAdmin) {
     }
     if ($DisablePrivateBrowsing) {
         Write-Host "Chrome Incognito and Edge InPrivate were disabled to prevent users bypassing managed protections."
+    } elseif ($RequirePrivateBrowsingGuard) {
+        Write-Host "Incognito/InPrivate stay enabled, but private navigation now requires AI Guard to remain allowed."
     }
 } else {
     Write-Host "Current-user install does not force-enable the extension. Load the installed extension folder unpacked in Chrome/Edge:"

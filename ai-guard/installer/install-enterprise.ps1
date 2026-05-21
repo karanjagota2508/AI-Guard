@@ -35,7 +35,7 @@ $params = @{
     PiiPort                        = $PiiPort
     BlockOtherExtensions          = $true
     EnforceBrowserHostBlocklist   = $true
-    DisablePrivateBrowsing        = $true
+    RequirePrivateBrowsingGuard   = $true
     DisallowExtensionDeveloperMode = $true
     DisableBrowserDeveloperTools  = $true
 }

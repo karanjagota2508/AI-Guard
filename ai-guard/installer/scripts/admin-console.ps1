@@ -551,8 +551,8 @@ function Apply-BrowserPoliciesFromConfig {
 
     Set-AIGuardBrowserHostBlocklistPolicy -Hive $hive -Browser "Chrome" -Hosts $hosts
     Set-AIGuardBrowserHostBlocklistPolicy -Hive $hive -Browser "Edge" -Hosts $hosts
-    Set-AIGuardPrivateBrowsingPolicy -Hive $hive -Browser "Chrome" -Disable
-    Set-AIGuardPrivateBrowsingPolicy -Hive $hive -Browser "Edge" -Disable
+    Set-AIGuardPrivateBrowsingPolicy -Hive $hive -Browser "Chrome"
+    Set-AIGuardPrivateBrowsingPolicy -Hive $hive -Browser "Edge"
 }
 
 if (-not $ConfigPath) {
@@ -840,7 +840,7 @@ function Save-And-Apply {
     $result = Restart-AIGuardRuntime
     $statusLabel.Text = "Saved. $result"
     [System.Windows.Forms.MessageBox]::Show(
-        "Provider settings were saved successfully.`r`n`r`nBrowser URL block policy was updated and private browsing remains disabled by policy.`r`n`r`n$result",
+        "Provider settings were saved successfully.`r`n`r`nBrowser URL block policy was updated. Incognito/InPrivate remain enabled, but blocked providers stay denied by browser policy.`r`n`r`n$result",
         "AI Guard Agent",
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Information
