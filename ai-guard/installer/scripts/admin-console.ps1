@@ -10,7 +10,18 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-. (Join-Path $PSScriptRoot "browser-policies.ps1")
+$browserPoliciesScript = Join-Path $PSScriptRoot "browser-policies.ps1"
+if (-not (Test-Path $browserPoliciesScript)) {
+    [System.Windows.Forms.MessageBox]::Show(
+        "AI Guard Agent Admin Console is missing a required helper file:`r`n$browserPoliciesScript`r`n`r`nRun the latest AI Guard setup and choose Install / Repair.",
+        "AI Guard Agent",
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Error
+    ) | Out-Null
+    return
+}
+
+. $browserPoliciesScript
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
