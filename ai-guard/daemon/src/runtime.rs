@@ -46,7 +46,10 @@ impl AppState {
 </gupdate>
 "#,
             extension_id = self.config.package.extension_id,
-            base_url = self.config.base_url().unwrap_or_else(|_| "http://127.0.0.1:48555".to_string()),
+            base_url = self
+                .config
+                .base_url()
+                .unwrap_or_else(|_| "http://127.0.0.1:48555".to_string()),
             version = self.config.package.extension_version,
         )
     }

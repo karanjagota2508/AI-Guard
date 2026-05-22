@@ -9,6 +9,8 @@ from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
 from pydantic import BaseModel
 
+from detection_filters import build_detect_entity_list, filter_detected_entities
+
 
 DEFAULT_ALLOWED_ORIGINS = "http://127.0.0.1,http://localhost"
 DEFAULT_HOST = "127.0.0.1"
@@ -110,13 +112,14 @@ def build_operator(config: Optional[GlobalOperatorConfig]) -> OperatorConfig:
 
 
 def detect_entities(req: PiiDetectRequest) -> List[Dict[str, Any]]:
+    entities = build_detect_entity_list(req.entities)
     results = analyzer.analyze(
         text=req.text,
         language="en",
         score_threshold=req.score_threshold,
-        entities=req.entities,
+        entities=entities,
     )
-    return [
+    detected = [
         {
             "entity_type": result.entity_type,
             "start": result.start,
@@ -125,6 +128,7 @@ def detect_entities(req: PiiDetectRequest) -> List[Dict[str, Any]]:
         }
         for result in results
     ]
+    return filter_detected_entities(req.text, detected)
 
 
 def classify_severity(detected: List[Dict[str, Any]]) -> str:

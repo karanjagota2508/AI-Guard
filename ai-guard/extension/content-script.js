@@ -9,6 +9,7 @@ let cachedScan = {
 let submitBypassUntil = 0;
 let submitInFlight = false;
 let inputTimer = null;
+let inputSequence = 0;
 
 bootstrapClaudeObservers();
 
@@ -38,6 +39,8 @@ async function onPaste(event) {
     return;
   }
 
+  inputSequence += 1;
+  window.clearTimeout(inputTimer);
   const selectionSnapshot = captureEditorSelection(editor);
   event.preventDefault();
   stopEvent(event);
@@ -71,14 +74,23 @@ function onInput(event) {
   }
 
   notifyActivity(true);
+  const scheduledSequence = ++inputSequence;
   window.clearTimeout(inputTimer);
   inputTimer = window.setTimeout(async () => {
+    if (scheduledSequence !== inputSequence) {
+      return;
+    }
+
     const prompt = readEditorText(editor);
     if (!prompt.trim()) {
       return;
     }
 
     const response = await scanText(prompt, "debounce");
+    if (scheduledSequence !== inputSequence) {
+      return;
+    }
+
     cachedScan = { text: prompt, response };
     enforceDebouncedDecision(editor, prompt, response);
   }, DEBOUNCE_MS);
@@ -145,6 +157,8 @@ async function handleSubmit(editor) {
   }
 
   submitInFlight = true;
+  inputSequence += 1;
+  window.clearTimeout(inputTimer);
   notifyActivity(true);
 
   try {

@@ -26,7 +26,8 @@ pub async fn run(origin: Option<&str>, config: AppConfig) -> Result<()> {
         return Ok(());
     }
 
-    let request: NativeHostRequest = read_message().context("failed to read native host request")?;
+    let request: NativeHostRequest =
+        read_message().context("failed to read native host request")?;
     let live_status = fetch_live_status(&config, origin).await.ok();
     let state = AppState::new(config.clone())?;
     let snapshot = live_status

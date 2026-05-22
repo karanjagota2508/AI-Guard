@@ -78,7 +78,11 @@ fn enforce_process_blocking(config: &AppConfig, system: &System) {
             .iter()
             .any(|candidate| normalized == *candidate || normalized.starts_with(candidate))
         {
-            warn!(pid = pid_u32, process = raw_name, "blocking disallowed process");
+            warn!(
+                pid = pid_u32,
+                process = raw_name,
+                "blocking disallowed process"
+            );
             let _ = process.kill();
         }
     }

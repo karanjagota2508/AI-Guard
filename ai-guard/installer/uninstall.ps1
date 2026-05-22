@@ -38,6 +38,27 @@ function Remove-RegistryValueIfPresent {
     $baseKey.Dispose()
 }
 
+function Stop-ProcessesByCommandLinePattern {
+    param(
+        [string[]]$Patterns
+    )
+
+    if (-not $Patterns -or $Patterns.Count -eq 0) {
+        return
+    }
+
+    $processes = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.Name -ieq "powershell.exe" -and $_.CommandLine
+    }
+
+    foreach ($process in $processes) {
+        $commandLine = [string]$process.CommandLine
+        if ($Patterns | Where-Object { $commandLine -like "*$_*" }) {
+            Invoke-CimMethod -InputObject $process -MethodName Terminate -ErrorAction SilentlyContinue | Out-Null
+        }
+    }
+}
+
 . (Join-Path $PSScriptRoot "scripts\browser-policies.ps1")
 
 $isAdmin = Test-IsAdministrator
@@ -45,7 +66,14 @@ if (-not $isAdmin -and $InstallRoot.StartsWith($env:ProgramFiles, [System.String
     $InstallRoot = Join-Path $env:LOCALAPPDATA "AI Guard Agent"
 }
 
-$registryHive = if ($isAdmin) { [Microsoft.Win32.RegistryHive]::LocalMachine } else { [Microsoft.Win32.RegistryHive]::CurrentUser }
+$registryHives = if ($isAdmin) {
+    @(
+        [Microsoft.Win32.RegistryHive]::LocalMachine,
+        [Microsoft.Win32.RegistryHive]::CurrentUser
+    )
+} else {
+    @([Microsoft.Win32.RegistryHive]::CurrentUser)
+}
 
 $serviceName = "AIGuardAgent"
 $machineAdminConsoleShortcut = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Guard Agent Admin Console.lnk"
@@ -71,6 +99,11 @@ if (Test-Path $claudePatchScript) {
     & $claudePatchScript -Restore -SkipRestart
 }
 
+Stop-ProcessesByCommandLinePattern -Patterns @(
+    "claude-desktop-uia-guard.ps1",
+    "launch-claude-desktop.ps1"
+)
+
 $piiListener = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($piiListener) {
     $piiOwner = Get-Process -Id $piiListener.OwningProcess -ErrorAction SilentlyContinue
@@ -79,13 +112,15 @@ if ($piiListener) {
     }
 }
 
-Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Google\Chrome\NativeMessagingHosts\com.wininfosoft.ai_guard"
-Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Edge\NativeMessagingHosts\com.wininfosoft.ai_guard"
-Remove-ManagedExtensionPolicy -Hive $registryHive -Browser "Chrome" -ExtensionId "kgfkgellcbbmadimiahbfndmfbhfobko"
-Remove-ManagedExtensionPolicy -Hive $registryHive -Browser "Edge" -ExtensionId "kgfkgellcbbmadimiahbfndmfbhfobko"
-Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Google\Chrome\Extensions\kgfkgellcbbmadimiahbfndmfbhfobko"
-Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Edge\Extensions\kgfkgellcbbmadimiahbfndmfbhfobko"
-Remove-RegistryValueIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -Name "AIGuardAgent"
+foreach ($registryHive in $registryHives) {
+    Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Google\Chrome\NativeMessagingHosts\com.wininfosoft.ai_guard"
+    Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Edge\NativeMessagingHosts\com.wininfosoft.ai_guard"
+    Remove-ManagedExtensionPolicy -Hive $registryHive -Browser "Chrome" -ExtensionId "kgfkgellcbbmadimiahbfndmfbhfobko"
+    Remove-ManagedExtensionPolicy -Hive $registryHive -Browser "Edge" -ExtensionId "kgfkgellcbbmadimiahbfndmfbhfobko"
+    Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Google\Chrome\Extensions\kgfkgellcbbmadimiahbfndmfbhfobko"
+    Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Edge\Extensions\kgfkgellcbbmadimiahbfndmfbhfobko"
+    Remove-RegistryValueIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -Name "AIGuardAgent"
+}
 
 foreach ($shortcut in @($machineAdminConsoleShortcut, $userAdminConsoleShortcut)) {
     if ($shortcut -and (Test-Path $shortcut)) {

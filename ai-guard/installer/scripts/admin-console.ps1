@@ -637,156 +637,308 @@ $providerCatalog = [ordered]@{
 
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
+function New-CardPanel {
+    param(
+        [int]$X,
+        [int]$Y,
+        [int]$Width,
+        [int]$Height
+    )
+
+    $panel = New-Object System.Windows.Forms.Panel
+    $panel.Location = New-Object System.Drawing.Point($X, $Y)
+    $panel.Size = New-Object System.Drawing.Size($Width, $Height)
+    $panel.BackColor = [System.Drawing.Color]::White
+    $panel.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+    return $panel
+}
+
+function Set-ButtonTheme {
+    param(
+        [System.Windows.Forms.Button]$Button,
+        [ValidateSet("Primary", "Secondary", "Ghost", "Danger")]
+        [string]$Variant = "Primary"
+    )
+
+    $Button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $Button.FlatAppearance.BorderSize = 0
+    $Button.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
+    $Button.Cursor = [System.Windows.Forms.Cursors]::Hand
+
+    switch ($Variant) {
+        "Primary" {
+            $Button.BackColor = [System.Drawing.Color]::FromArgb(211, 101, 48)
+            $Button.ForeColor = [System.Drawing.Color]::White
+        }
+        "Secondary" {
+            $Button.BackColor = [System.Drawing.Color]::FromArgb(16, 35, 59)
+            $Button.ForeColor = [System.Drawing.Color]::White
+        }
+        "Ghost" {
+            $Button.BackColor = [System.Drawing.Color]::FromArgb(240, 243, 249)
+            $Button.ForeColor = [System.Drawing.Color]::FromArgb(16, 35, 59)
+        }
+        "Danger" {
+            $Button.BackColor = [System.Drawing.Color]::FromArgb(165, 32, 32)
+            $Button.ForeColor = [System.Drawing.Color]::White
+        }
+    }
+}
+
+function Set-InputTheme {
+    param(
+        [System.Windows.Forms.Control]$Control
+    )
+
+    $Control.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $Control.BackColor = [System.Drawing.Color]::FromArgb(248, 250, 253)
+    $Control.ForeColor = [System.Drawing.Color]::FromArgb(27, 39, 53)
+}
+
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "AI Guard Agent Admin Console"
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
-$form.Size = New-Object System.Drawing.Size(980, 640)
-$form.MinimumSize = New-Object System.Drawing.Size(980, 640)
-$form.BackColor = [System.Drawing.Color]::FromArgb(248, 249, 252)
+$form.Size = New-Object System.Drawing.Size(1080, 720)
+$form.MinimumSize = New-Object System.Drawing.Size(1080, 720)
+$form.BackColor = [System.Drawing.Color]::FromArgb(239, 242, 247)
+$form.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+
+$heroPanel = New-Object System.Windows.Forms.Panel
+$heroPanel.Location = New-Object System.Drawing.Point(18, 16)
+$heroPanel.Size = New-Object System.Drawing.Size(1028, 132)
+$heroPanel.BackColor = [System.Drawing.Color]::FromArgb(16, 35, 59)
+$form.Controls.Add($heroPanel)
+
+$heroEyebrow = New-Object System.Windows.Forms.Label
+$heroEyebrow.Text = "WIN INFOSOFT · ENTERPRISE CONTROL"
+$heroEyebrow.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 9)
+$heroEyebrow.ForeColor = [System.Drawing.Color]::FromArgb(242, 177, 140)
+$heroEyebrow.Location = New-Object System.Drawing.Point(24, 18)
+$heroEyebrow.AutoSize = $true
+$heroPanel.Controls.Add($heroEyebrow)
 
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "AI Guard Agent Admin Console"
-$title.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 18, [System.Drawing.FontStyle]::Bold)
-$title.Location = New-Object System.Drawing.Point(20, 16)
+$title.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 22, [System.Drawing.FontStyle]::Bold)
+$title.ForeColor = [System.Drawing.Color]::White
+$title.Location = New-Object System.Drawing.Point(22, 38)
 $title.AutoSize = $true
-$form.Controls.Add($title)
+$heroPanel.Controls.Add($title)
 
 $subtitle = New-Object System.Windows.Forms.Label
-$subtitle.Text = "Only administrators with the admin-console password can change blocked providers. Standard users remain read-only when AI Guard is machine-installed."
+$subtitle.Text = "Manage blocked providers, enforce browser policy, and keep Claude-only protection tight without exposing controls to standard users."
 $subtitle.Font = New-Object System.Drawing.Font("Segoe UI", 10)
-$subtitle.Location = New-Object System.Drawing.Point(22, 52)
-$subtitle.Size = New-Object System.Drawing.Size(920, 40)
-$form.Controls.Add($subtitle)
+$subtitle.ForeColor = [System.Drawing.Color]::FromArgb(221, 229, 238)
+$subtitle.Location = New-Object System.Drawing.Point(26, 82)
+$subtitle.Size = New-Object System.Drawing.Size(700, 34)
+$heroPanel.Controls.Add($subtitle)
 
-$presetGroup = New-Object System.Windows.Forms.GroupBox
-$presetGroup.Text = "Provider Presets"
-$presetGroup.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
-$presetGroup.Location = New-Object System.Drawing.Point(20, 98)
-$presetGroup.Size = New-Object System.Drawing.Size(924, 86)
-$form.Controls.Add($presetGroup)
+$installModeBadge = New-Object System.Windows.Forms.Label
+$installModeBadge.Text = if ($ConfigPath -and $ConfigPath.StartsWith($env:ProgramFiles, [System.StringComparison]::OrdinalIgnoreCase)) { "Machine Install" } else { "Current User Install" }
+$installModeBadge.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
+$installModeBadge.ForeColor = [System.Drawing.Color]::White
+$installModeBadge.BackColor = [System.Drawing.Color]::FromArgb(211, 101, 48)
+$installModeBadge.Location = New-Object System.Drawing.Point(808, 24)
+$installModeBadge.Size = New-Object System.Drawing.Size(180, 34)
+$installModeBadge.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+$heroPanel.Controls.Add($installModeBadge)
+
+$configBadge = New-Object System.Windows.Forms.Label
+$configBadge.Text = $ConfigPath
+$configBadge.Font = New-Object System.Drawing.Font("Segoe UI", 8.5)
+$configBadge.ForeColor = [System.Drawing.Color]::FromArgb(221, 229, 238)
+$configBadge.Location = New-Object System.Drawing.Point(598, 86)
+$configBadge.Size = New-Object System.Drawing.Size(390, 30)
+$configBadge.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
+$heroPanel.Controls.Add($configBadge)
+
+$presetCard = New-CardPanel -X 18 -Y 164 -Width 1028 -Height 104
+$form.Controls.Add($presetCard)
+
+$presetTitle = New-Object System.Windows.Forms.Label
+$presetTitle.Text = "Provider Presets"
+$presetTitle.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 12)
+$presetTitle.ForeColor = [System.Drawing.Color]::FromArgb(16, 35, 59)
+$presetTitle.Location = New-Object System.Drawing.Point(18, 14)
+$presetTitle.AutoSize = $true
+$presetCard.Controls.Add($presetTitle)
+
+$presetHint = New-Object System.Windows.Forms.Label
+$presetHint.Text = "Add a curated provider pack with known browser hosts and desktop process names."
+$presetHint.Location = New-Object System.Drawing.Point(18, 40)
+$presetHint.Size = New-Object System.Drawing.Size(480, 22)
+$presetHint.ForeColor = [System.Drawing.Color]::FromArgb(94, 109, 128)
+$presetCard.Controls.Add($presetHint)
 
 $presetCombo = New-Object System.Windows.Forms.ComboBox
 $presetCombo.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-$presetCombo.Location = New-Object System.Drawing.Point(16, 34)
-$presetCombo.Size = New-Object System.Drawing.Size(340, 28)
+$presetCombo.Location = New-Object System.Drawing.Point(22, 68)
+$presetCombo.Size = New-Object System.Drawing.Size(320, 30)
 $presetCombo.Items.AddRange(@($providerCatalog.Keys))
 $presetCombo.SelectedIndex = 0
-$presetGroup.Controls.Add($presetCombo)
+Set-InputTheme -Control $presetCombo
+$presetCard.Controls.Add($presetCombo)
 
-$presetHint = New-Object System.Windows.Forms.Label
-$presetHint.Text = "Preset adds known domains and desktop process names for the selected provider."
-$presetHint.Location = New-Object System.Drawing.Point(370, 38)
-$presetHint.Size = New-Object System.Drawing.Size(370, 24)
-$presetGroup.Controls.Add($presetHint)
+$presetNote = New-Object System.Windows.Forms.Label
+$presetNote.Text = "Use this for common providers, then fine-tune hosts and processes below."
+$presetNote.Location = New-Object System.Drawing.Point(360, 72)
+$presetNote.Size = New-Object System.Drawing.Size(420, 22)
+$presetNote.ForeColor = [System.Drawing.Color]::FromArgb(94, 109, 128)
+$presetCard.Controls.Add($presetNote)
 
 $addPresetButton = New-Object System.Windows.Forms.Button
 $addPresetButton.Text = "Add Provider"
-$addPresetButton.Location = New-Object System.Drawing.Point(778, 31)
-$addPresetButton.Size = New-Object System.Drawing.Size(126, 32)
-$presetGroup.Controls.Add($addPresetButton)
+$addPresetButton.Location = New-Object System.Drawing.Point(864, 64)
+$addPresetButton.Size = New-Object System.Drawing.Size(138, 34)
+Set-ButtonTheme -Button $addPresetButton -Variant Secondary
+$presetCard.Controls.Add($addPresetButton)
 
-$webGroup = New-Object System.Windows.Forms.GroupBox
-$webGroup.Text = "Blocked Websites / Hosts"
-$webGroup.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
-$webGroup.Location = New-Object System.Drawing.Point(20, 198)
-$webGroup.Size = New-Object System.Drawing.Size(446, 320)
-$form.Controls.Add($webGroup)
+$webCard = New-CardPanel -X 18 -Y 286 -Width 502 -Height 336
+$form.Controls.Add($webCard)
+
+$webTitle = New-Object System.Windows.Forms.Label
+$webTitle.Text = "Blocked Websites / Hosts"
+$webTitle.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 12)
+$webTitle.ForeColor = [System.Drawing.Color]::FromArgb(16, 35, 59)
+$webTitle.Location = New-Object System.Drawing.Point(18, 14)
+$webTitle.AutoSize = $true
+$webCard.Controls.Add($webTitle)
+
+$webCaption = New-Object System.Windows.Forms.Label
+$webCaption.Text = "These hosts are denied by extension logic and enterprise browser policy."
+$webCaption.Location = New-Object System.Drawing.Point(18, 40)
+$webCaption.Size = New-Object System.Drawing.Size(440, 22)
+$webCaption.ForeColor = [System.Drawing.Color]::FromArgb(94, 109, 128)
+$webCard.Controls.Add($webCaption)
 
 $webList = New-Object System.Windows.Forms.ListBox
 $webList.SelectionMode = [System.Windows.Forms.SelectionMode]::MultiExtended
-$webList.Location = New-Object System.Drawing.Point(16, 32)
-$webList.Size = New-Object System.Drawing.Size(412, 212)
-$webGroup.Controls.Add($webList)
+$webList.Location = New-Object System.Drawing.Point(20, 72)
+$webList.Size = New-Object System.Drawing.Size(460, 186)
+Set-InputTheme -Control $webList
+$webCard.Controls.Add($webList)
 
 $webInput = New-Object System.Windows.Forms.TextBox
-$webInput.Location = New-Object System.Drawing.Point(16, 258)
-$webInput.Size = New-Object System.Drawing.Size(272, 28)
-$webGroup.Controls.Add($webInput)
+$webInput.Location = New-Object System.Drawing.Point(20, 274)
+$webInput.Size = New-Object System.Drawing.Size(280, 30)
+Set-InputTheme -Control $webInput
+$webCard.Controls.Add($webInput)
 
 $webAddButton = New-Object System.Windows.Forms.Button
 $webAddButton.Text = "Add Host"
-$webAddButton.Location = New-Object System.Drawing.Point(300, 255)
-$webAddButton.Size = New-Object System.Drawing.Size(128, 30)
-$webGroup.Controls.Add($webAddButton)
+$webAddButton.Location = New-Object System.Drawing.Point(314, 272)
+$webAddButton.Size = New-Object System.Drawing.Size(78, 32)
+Set-ButtonTheme -Button $webAddButton -Variant Primary
+$webCard.Controls.Add($webAddButton)
 
 $webRemoveButton = New-Object System.Windows.Forms.Button
-$webRemoveButton.Text = "Remove Selected"
-$webRemoveButton.Location = New-Object System.Drawing.Point(300, 289)
-$webRemoveButton.Size = New-Object System.Drawing.Size(128, 30)
-$webGroup.Controls.Add($webRemoveButton)
+$webRemoveButton.Text = "Remove"
+$webRemoveButton.Location = New-Object System.Drawing.Point(402, 272)
+$webRemoveButton.Size = New-Object System.Drawing.Size(78, 32)
+Set-ButtonTheme -Button $webRemoveButton -Variant Ghost
+$webCard.Controls.Add($webRemoveButton)
 
 $webHelp = New-Object System.Windows.Forms.Label
 $webHelp.Text = "Examples: grok.com, gemini.google.com, chat.deepseek.com"
-$webHelp.Location = New-Object System.Drawing.Point(16, 292)
-$webHelp.Size = New-Object System.Drawing.Size(272, 24)
-$webGroup.Controls.Add($webHelp)
+$webHelp.Location = New-Object System.Drawing.Point(20, 308)
+$webHelp.Size = New-Object System.Drawing.Size(360, 20)
+$webHelp.ForeColor = [System.Drawing.Color]::FromArgb(94, 109, 128)
+$webCard.Controls.Add($webHelp)
 
-$processGroup = New-Object System.Windows.Forms.GroupBox
-$processGroup.Text = "Blocked Desktop Processes"
-$processGroup.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
-$processGroup.Location = New-Object System.Drawing.Point(498, 198)
-$processGroup.Size = New-Object System.Drawing.Size(446, 320)
-$form.Controls.Add($processGroup)
+$processCard = New-CardPanel -X 544 -Y 286 -Width 502 -Height 336
+$form.Controls.Add($processCard)
+
+$processTitle = New-Object System.Windows.Forms.Label
+$processTitle.Text = "Blocked Desktop Processes"
+$processTitle.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 12)
+$processTitle.ForeColor = [System.Drawing.Color]::FromArgb(16, 35, 59)
+$processTitle.Location = New-Object System.Drawing.Point(18, 14)
+$processTitle.AutoSize = $true
+$processCard.Controls.Add($processTitle)
+
+$processCaption = New-Object System.Windows.Forms.Label
+$processCaption.Text = "These process names are killed while Claude guard mode is active."
+$processCaption.Location = New-Object System.Drawing.Point(18, 40)
+$processCaption.Size = New-Object System.Drawing.Size(440, 22)
+$processCaption.ForeColor = [System.Drawing.Color]::FromArgb(94, 109, 128)
+$processCard.Controls.Add($processCaption)
 
 $processList = New-Object System.Windows.Forms.ListBox
 $processList.SelectionMode = [System.Windows.Forms.SelectionMode]::MultiExtended
-$processList.Location = New-Object System.Drawing.Point(16, 32)
-$processList.Size = New-Object System.Drawing.Size(412, 212)
-$processGroup.Controls.Add($processList)
+$processList.Location = New-Object System.Drawing.Point(20, 72)
+$processList.Size = New-Object System.Drawing.Size(460, 186)
+Set-InputTheme -Control $processList
+$processCard.Controls.Add($processList)
 
 $processInput = New-Object System.Windows.Forms.TextBox
-$processInput.Location = New-Object System.Drawing.Point(16, 258)
-$processInput.Size = New-Object System.Drawing.Size(272, 28)
-$processGroup.Controls.Add($processInput)
+$processInput.Location = New-Object System.Drawing.Point(20, 274)
+$processInput.Size = New-Object System.Drawing.Size(280, 30)
+Set-InputTheme -Control $processInput
+$processCard.Controls.Add($processInput)
 
 $processAddButton = New-Object System.Windows.Forms.Button
 $processAddButton.Text = "Add Process"
-$processAddButton.Location = New-Object System.Drawing.Point(300, 255)
-$processAddButton.Size = New-Object System.Drawing.Size(128, 30)
-$processGroup.Controls.Add($processAddButton)
+$processAddButton.Location = New-Object System.Drawing.Point(314, 272)
+$processAddButton.Size = New-Object System.Drawing.Size(86, 32)
+Set-ButtonTheme -Button $processAddButton -Variant Primary
+$processCard.Controls.Add($processAddButton)
 
 $processRemoveButton = New-Object System.Windows.Forms.Button
-$processRemoveButton.Text = "Remove Selected"
-$processRemoveButton.Location = New-Object System.Drawing.Point(300, 289)
-$processRemoveButton.Size = New-Object System.Drawing.Size(128, 30)
-$processGroup.Controls.Add($processRemoveButton)
+$processRemoveButton.Text = "Remove"
+$processRemoveButton.Location = New-Object System.Drawing.Point(406, 272)
+$processRemoveButton.Size = New-Object System.Drawing.Size(74, 32)
+Set-ButtonTheme -Button $processRemoveButton -Variant Ghost
+$processCard.Controls.Add($processRemoveButton)
 
 $processHelp = New-Object System.Windows.Forms.Label
 $processHelp.Text = "Examples: Cursor, Ollama, LM Studio, ChatGPT"
-$processHelp.Location = New-Object System.Drawing.Point(16, 292)
-$processHelp.Size = New-Object System.Drawing.Size(272, 24)
-$processGroup.Controls.Add($processHelp)
+$processHelp.Location = New-Object System.Drawing.Point(20, 308)
+$processHelp.Size = New-Object System.Drawing.Size(320, 20)
+$processHelp.ForeColor = [System.Drawing.Color]::FromArgb(94, 109, 128)
+$processCard.Controls.Add($processHelp)
+
+$footerPanel = New-Object System.Windows.Forms.Panel
+$footerPanel.Location = New-Object System.Drawing.Point(18, 636)
+$footerPanel.Size = New-Object System.Drawing.Size(1028, 54)
+$footerPanel.BackColor = [System.Drawing.Color]::FromArgb(247, 249, 252)
+$footerPanel.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+$form.Controls.Add($footerPanel)
 
 $statusLabel = New-Object System.Windows.Forms.Label
 $statusLabel.Text = "Ready."
-$statusLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10)
-$statusLabel.Location = New-Object System.Drawing.Point(22, 532)
-$statusLabel.Size = New-Object System.Drawing.Size(360, 24)
-$form.Controls.Add($statusLabel)
+$statusLabel.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
+$statusLabel.ForeColor = [System.Drawing.Color]::FromArgb(16, 35, 59)
+$statusLabel.Location = New-Object System.Drawing.Point(18, 16)
+$statusLabel.Size = New-Object System.Drawing.Size(390, 22)
+$footerPanel.Controls.Add($statusLabel)
 
 $changePasswordButton = New-Object System.Windows.Forms.Button
-$changePasswordButton.Text = "Change Console Password"
-$changePasswordButton.Location = New-Object System.Drawing.Point(380, 548)
-$changePasswordButton.Size = New-Object System.Drawing.Size(170, 34)
-$form.Controls.Add($changePasswordButton)
+$changePasswordButton.Text = "Change Password"
+$changePasswordButton.Location = New-Object System.Drawing.Point(542, 10)
+$changePasswordButton.Size = New-Object System.Drawing.Size(150, 32)
+Set-ButtonTheme -Button $changePasswordButton -Variant Ghost
+$footerPanel.Controls.Add($changePasswordButton)
 
 $reloadButton = New-Object System.Windows.Forms.Button
 $reloadButton.Text = "Reload"
-$reloadButton.Location = New-Object System.Drawing.Point(564, 548)
-$reloadButton.Size = New-Object System.Drawing.Size(110, 34)
-$form.Controls.Add($reloadButton)
+$reloadButton.Location = New-Object System.Drawing.Point(706, 10)
+$reloadButton.Size = New-Object System.Drawing.Size(86, 32)
+Set-ButtonTheme -Button $reloadButton -Variant Ghost
+$footerPanel.Controls.Add($reloadButton)
 
 $saveButton = New-Object System.Windows.Forms.Button
 $saveButton.Text = "Save and Apply"
-$saveButton.Location = New-Object System.Drawing.Point(688, 548)
-$saveButton.Size = New-Object System.Drawing.Size(144, 34)
-$form.Controls.Add($saveButton)
+$saveButton.Location = New-Object System.Drawing.Point(806, 10)
+$saveButton.Size = New-Object System.Drawing.Size(132, 32)
+Set-ButtonTheme -Button $saveButton -Variant Primary
+$footerPanel.Controls.Add($saveButton)
 
 $closeButton = New-Object System.Windows.Forms.Button
 $closeButton.Text = "Close"
-$closeButton.Location = New-Object System.Drawing.Point(842, 548)
-$closeButton.Size = New-Object System.Drawing.Size(102, 34)
-$form.Controls.Add($closeButton)
+$closeButton.Location = New-Object System.Drawing.Point(950, 10)
+$closeButton.Size = New-Object System.Drawing.Size(60, 32)
+Set-ButtonTheme -Button $closeButton -Variant Secondary
+$footerPanel.Controls.Add($closeButton)
 
 function Refresh-UiFromConfig {
     $script:config = Read-Config

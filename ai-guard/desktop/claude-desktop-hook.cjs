@@ -18,6 +18,7 @@ let cachedScan = {
 let submitBypassUntil = 0;
 let submitInFlight = false;
 let inputTimer = null;
+let inputSequence = 0;
 
 bootstrapWhenReady();
 
@@ -107,6 +108,8 @@ async function onPaste(event) {
     return;
   }
 
+  inputSequence += 1;
+  window.clearTimeout(inputTimer);
   const selectionSnapshot = captureEditorSelection(editor);
   event.preventDefault();
   stopEvent(event);
@@ -138,14 +141,23 @@ function onInput(event) {
     return;
   }
 
+  const scheduledSequence = ++inputSequence;
   window.clearTimeout(inputTimer);
   inputTimer = window.setTimeout(async () => {
+    if (scheduledSequence !== inputSequence) {
+      return;
+    }
+
     const prompt = readEditorText(editor);
     if (!prompt.trim()) {
       return;
     }
 
     const response = await scanText(prompt, "desktop_debounce");
+    if (scheduledSequence !== inputSequence) {
+      return;
+    }
+
     cachedScan = { text: prompt, response };
     enforceDebouncedDecision(editor, prompt, response);
   }, DEBOUNCE_MS);
@@ -220,6 +232,8 @@ async function handleSubmit(editor) {
   }
 
   submitInFlight = true;
+  inputSequence += 1;
+  window.clearTimeout(inputTimer);
 
   try {
     const response = await scanText(prompt, "desktop_submit");

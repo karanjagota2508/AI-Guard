@@ -147,7 +147,10 @@ fn configure_stdio(command: &mut Command, config: &ManagedPiiConfig) -> Result<(
     if let Some(path) = &config.stdout_log_path {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).with_context(|| {
-                format!("failed to create managed PII stdout log directory {}", parent.display())
+                format!(
+                    "failed to create managed PII stdout log directory {}",
+                    parent.display()
+                )
             })?;
         }
         let file = OpenOptions::new()
@@ -163,7 +166,10 @@ fn configure_stdio(command: &mut Command, config: &ManagedPiiConfig) -> Result<(
     if let Some(path) = &config.stderr_log_path {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).with_context(|| {
-                format!("failed to create managed PII stderr log directory {}", parent.display())
+                format!(
+                    "failed to create managed PII stderr log directory {}",
+                    parent.display()
+                )
             })?;
         }
         let file = OpenOptions::new()

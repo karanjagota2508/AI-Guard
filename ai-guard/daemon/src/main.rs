@@ -36,7 +36,10 @@ enum Command {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
-    if let Some(origin) = args.get(1).filter(|value| value.starts_with("chrome-extension://")) {
+    if let Some(origin) = args
+        .get(1)
+        .filter(|value| value.starts_with("chrome-extension://"))
+    {
         let config = AppConfig::load(&default_config_path())?;
         return native_host::run(Some(origin), config).await;
     }

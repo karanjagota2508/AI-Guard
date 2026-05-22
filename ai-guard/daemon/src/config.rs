@@ -80,7 +80,8 @@ impl AppConfig {
         config.logging.directory = resolve_path(config_dir, &config.logging.directory);
         if let Some(managed_pii) = config.managed_pii.as_mut() {
             managed_pii.executable = resolve_command_path(config_dir, &managed_pii.executable);
-            managed_pii.working_directory = resolve_path(config_dir, &managed_pii.working_directory);
+            managed_pii.working_directory =
+                resolve_path(config_dir, &managed_pii.working_directory);
             managed_pii.stdout_log_path = managed_pii
                 .stdout_log_path
                 .as_ref()

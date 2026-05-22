@@ -48,15 +48,16 @@ mod service_impl {
         let stop_requested = Arc::new(AtomicBool::new(false));
         let flag = stop_requested.clone();
 
-        let status_handle = service_control_handler::register(SERVICE_NAME, move |control_event| {
-            match control_event {
+        let status_handle = service_control_handler::register(
+            SERVICE_NAME,
+            move |control_event| match control_event {
                 ServiceControl::Stop | ServiceControl::Shutdown => {
                     flag.store(true, Ordering::SeqCst);
                     ServiceControlHandlerResult::NoError
                 }
                 _ => ServiceControlHandlerResult::NotImplemented,
-            }
-        })?;
+            },
+        )?;
 
         status_handle.set_service_status(ServiceStatus {
             service_type: ServiceType::OWN_PROCESS,
