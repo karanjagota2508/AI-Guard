@@ -3,11 +3,14 @@ param(
     [int]$PiiPort,
     [string]$AuthToken,
     [string]$ExtensionCrxPath,
+    [string]$ExtensionId = "kgfkgellcbbmadimiahbfndmfbhfobko",
+    [string]$ExtensionVersion = "1.0.2",
     [string]$LogDirectory,
     [string]$PiiExecutablePath,
     [string]$PiiWorkingDirectory,
     [string]$PiiStdoutLogPath,
-    [string]$PiiStderrLogPath
+    [string]$PiiStderrLogPath,
+    [string[]]$ClaudeWebHosts = @("claude.ai", "claude.com")
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,10 +43,10 @@ $config = @{
     desktop_activity_ttl_ms = 5000
     process_poll_ms = 2000
     extension_ids = @(
-        "kgfkgellcbbmadimiahbfndmfbhfobko"
+        $ExtensionId
     )
     claude = @{
-        web_hosts = @("claude.ai")
+        web_hosts = @($ClaudeWebHosts)
         desktop_processes = @("claude")
     }
     blocking = @{
@@ -69,8 +72,8 @@ $config = @{
         )
     }
     package = @{
-        extension_id = "kgfkgellcbbmadimiahbfndmfbhfobko"
-        extension_version = "1.0.1"
+        extension_id = $ExtensionId
+        extension_version = $ExtensionVersion
         extension_crx_path = $ExtensionCrxPath
     }
     logging = @{

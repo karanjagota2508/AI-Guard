@@ -260,6 +260,7 @@ $registryHive = if ($isAdmin) { [Microsoft.Win32.RegistryHive]::LocalMachine } e
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $daemonProject = Join-Path $repoRoot "daemon"
+$extensionManifestPath = Join-Path $repoRoot "extension\manifest.json"
 $daemonBinarySource = Join-Path $daemonProject "target\release\ai-guard-daemon.exe"
 $piiBackendSource = Join-Path (Split-Path $repoRoot -Parent) "PII_agent\backend"
 $distDir = Join-Path $repoRoot "installer\dist"
@@ -267,7 +268,10 @@ $distDaemonBinary = Join-Path $distDir "ai-guard-daemon.exe"
 $distCrx = Join-Path $distDir "ai-guard-extension.crx"
 $token = New-RandomToken
 $serviceName = "AIGuardAgent"
+$extensionManifest = Get-Content -Path $extensionManifestPath -Raw | ConvertFrom-Json
 $extensionId = "kgfkgellcbbmadimiahbfndmfbhfobko"
+$extensionVersion = [string]$extensionManifest.version
+$claudeWebHosts = @("claude.ai", "claude.com")
 $origin = "chrome-extension://$extensionId/"
 $bundledPythonExecutable = Join-Path $distDir "python-runtime\python.exe"
 $wheelhouseDir = Join-Path $distDir "pii-wheelhouse"
@@ -357,11 +361,14 @@ $venvPython = ($venvPython | Select-Object -Last 1).Trim()
     -PiiPort $PiiPort `
     -AuthToken $token `
     -ExtensionCrxPath $installedCrx `
+    -ExtensionId $extensionId `
+    -ExtensionVersion $extensionVersion `
     -LogDirectory $installLogsDir `
     -PiiExecutablePath $venvPython `
     -PiiWorkingDirectory (Join-Path $installPiiDir "backend") `
     -PiiStdoutLogPath $piiStdoutLog `
-    -PiiStderrLogPath $piiStderrLog
+    -PiiStderrLogPath $piiStderrLog `
+    -ClaudeWebHosts $claudeWebHosts
 
 $effectiveConfig = Get-Content -Path $installedConfig -Raw | ConvertFrom-Json
 

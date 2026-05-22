@@ -1,5 +1,5 @@
 const NATIVE_HOST = "com.wininfosoft.ai_guard";
-const CLAUDE_HOSTS = ["claude.ai"];
+const CLAUDE_HOSTS = ["claude.ai", "claude.com"];
 const STATUS_CACHE_TTL_MS = 2000;
 const CLAUDE_PRESENCE_CACHE_TTL_MS = 1000;
 
