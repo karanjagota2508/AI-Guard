@@ -26,6 +26,15 @@ $stageAiGuardRoot = Join-Path $payloadRoot "ai-guard"
 $stageInstallerRoot = Join-Path $stageAiGuardRoot "installer"
 $stagePiiRoot = Join-Path $payloadRoot "PII_agent"
 $stagePowerShellScripts = @()
+$defaultRootPfx = Join-Path $workspaceRoot "techheights-certificate.pfx"
+
+if (-not $SigningPfxPath -and (Test-Path $defaultRootPfx)) {
+    $SigningPfxPath = $defaultRootPfx
+}
+
+if (-not $SigningPfxPassword -and $env:ULTI_GUARD_PFX_PASSWORD) {
+    $SigningPfxPassword = $env:ULTI_GUARD_PFX_PASSWORD
+}
 
 if (-not $AutoSelectSigningCertificate.IsPresent -and -not $SigningThumbprint -and -not $SigningPfxPath) {
     $AutoSelectSigningCertificate = $true
