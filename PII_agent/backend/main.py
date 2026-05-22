@@ -15,6 +15,7 @@ from detection_filters import build_detect_entity_list, filter_detected_entities
 DEFAULT_ALLOWED_ORIGINS = "http://127.0.0.1,http://localhost"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
+DEFAULT_SPACY_MODEL = os.getenv("PII_SPACY_MODEL", "en_core_web_sm")
 
 
 def parse_allowed_origins() -> List[str]:
@@ -37,7 +38,7 @@ app.add_middleware(
 def create_analyzer() -> AnalyzerEngine:
     configuration = {
         "nlp_engine_name": "spacy",
-        "models": [{"lang_code": "en", "model_name": "en_core_web_lg"}],
+        "models": [{"lang_code": "en", "model_name": DEFAULT_SPACY_MODEL}],
     }
     provider = NlpEngineProvider(nlp_configuration=configuration)
     nlp_engine = provider.create_engine()
