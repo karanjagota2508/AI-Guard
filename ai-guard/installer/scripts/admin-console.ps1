@@ -13,8 +13,8 @@ Add-Type -AssemblyName System.Drawing
 $browserPoliciesScript = Join-Path $PSScriptRoot "browser-policies.ps1"
 if (-not (Test-Path $browserPoliciesScript)) {
     [System.Windows.Forms.MessageBox]::Show(
-        "AI Guard Agent Admin Console is missing a required helper file:`r`n$browserPoliciesScript`r`n`r`nRun the latest AI Guard setup and choose Install / Repair.",
-        "AI Guard Agent",
+        "Ulti Guard Agent Admin Console is missing a required helper file:`r`n$browserPoliciesScript`r`n`r`nRun the latest Ulti Guard setup and choose Install / Repair.",
+        "Ulti Guard Agent",
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Error
     ) | Out-Null
@@ -32,7 +32,7 @@ function Test-IsAdministrator {
 function Invoke-SelfElevation {
     $parts = @(
         "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
+        "-ExecutionPolicy", "RemoteSigned",
         "-File", "`"$PSCommandPath`""
     )
 
@@ -53,8 +53,8 @@ function Invoke-SelfElevation {
         Start-Process -FilePath "powershell.exe" -Verb RunAs -ArgumentList ($parts -join " ") | Out-Null
     } catch {
         [System.Windows.Forms.MessageBox]::Show(
-            "Administrator approval is required to open AI Guard Agent Admin Console.",
-            "AI Guard Agent",
+            "Administrator approval is required to open Ulti Guard Agent Admin Console.",
+            "Ulti Guard Agent",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Warning
         ) | Out-Null
@@ -98,9 +98,28 @@ function Convert-ToHashtable {
     return $InputObject
 }
 
+function Get-BrandAssetPath {
+    param(
+        [string]$LeafName
+    )
+
+    $candidates = @(
+        (Join-Path (Split-Path $PSScriptRoot -Parent) "branding\$LeafName"),
+        (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) "branding\$LeafName")
+    )
+
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path $candidate)) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
 function Read-Config {
     if (-not (Test-Path $ConfigPath)) {
-        throw "AI Guard config not found at $ConfigPath"
+        throw "Ulti Guard config not found at $ConfigPath"
     }
 
     $raw = Get-Content -Path $ConfigPath -Raw
@@ -328,7 +347,7 @@ function Set-AdminConsolePassword {
         if ($password.Length -lt 8) {
             [System.Windows.Forms.MessageBox]::Show(
                 "Admin console password must be at least 8 characters long.",
-                "AI Guard Agent",
+                "Ulti Guard Agent",
                 [System.Windows.Forms.MessageBoxButtons]::OK,
                 [System.Windows.Forms.MessageBoxIcon]::Warning
             ) | Out-Null
@@ -338,7 +357,7 @@ function Set-AdminConsolePassword {
         if ($password -ne $confirm) {
             [System.Windows.Forms.MessageBox]::Show(
                 "Passwords do not match. Try again.",
-                "AI Guard Agent",
+                "Ulti Guard Agent",
                 [System.Windows.Forms.MessageBoxButtons]::OK,
                 [System.Windows.Forms.MessageBoxIcon]::Warning
             ) | Out-Null
@@ -359,14 +378,14 @@ function Confirm-AdminConsoleAccess {
     if (-not (Test-AdminConsolePasswordConfigured)) {
         $created = Set-AdminConsolePassword `
             -PromptTitle "Set Admin Console Password" `
-            -PromptMessage "Create a password for AI Guard Agent Admin Console. This password will be required every time the console opens."
+            -PromptMessage "Create a password for Ulti Guard Agent Admin Console. This password will be required every time the console opens."
         if (-not $created) {
             return $false
         }
 
         [System.Windows.Forms.MessageBox]::Show(
             "Admin console password has been set.",
-            "AI Guard Agent",
+            "Ulti Guard Agent",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Information
         ) | Out-Null
@@ -380,7 +399,7 @@ function Confirm-AdminConsoleAccess {
     for ($attempt = 1; $attempt -le 3; $attempt++) {
         $response = Show-PasswordPrompt `
             -Title "Admin Console Password" `
-            -Message "Enter the AI Guard Agent Admin Console password."
+            -Message "Enter the Ulti Guard Agent Admin Console password."
         if ($null -eq $response) {
             return $false
         }
@@ -393,7 +412,7 @@ function Confirm-AdminConsoleAccess {
 
         [System.Windows.Forms.MessageBox]::Show(
             "Incorrect password.",
-            "AI Guard Agent",
+            "Ulti Guard Agent",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Error
         ) | Out-Null
@@ -528,7 +547,7 @@ function Restart-AIGuardRuntime {
     Start-Sleep -Milliseconds 800
 
     if ($LauncherScriptPath -and (Test-Path $LauncherScriptPath)) {
-        Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$LauncherScriptPath`"" -WindowStyle Hidden | Out-Null
+        Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy RemoteSigned -File `"$LauncherScriptPath`"" -WindowStyle Hidden | Out-Null
         if (Wait-ForAIGuardHealth) {
             return "Daemon relaunched through launcher script."
         }
@@ -545,7 +564,7 @@ function Restart-AIGuardRuntime {
         return "Daemon launch attempted, but health check failed."
     }
 
-    return "Config saved. Restart AI Guard manually."
+    return "Config saved. Restart Ulti Guard manually."
 }
 
 function Get-PolicyRegistryHive {
@@ -567,9 +586,16 @@ function Apply-BrowserPoliciesFromConfig {
 }
 
 if (-not $ConfigPath) {
-    $candidate = Join-Path ${env:ProgramFiles} "AI Guard Agent\config\ai-guard.json"
-    if (Test-Path $candidate) {
-        $ConfigPath = $candidate
+    foreach ($candidate in @(
+        (Join-Path ${env:ProgramFiles} "Ulti Guard Agent\config\ai-guard.json"),
+        (Join-Path ${env:ProgramFiles} "AI Guard Agent\config\ai-guard.json"),
+        (Join-Path $env:LOCALAPPDATA "Ulti Guard Agent\config\ai-guard.json"),
+        (Join-Path $env:LOCALAPPDATA "AI Guard Agent\config\ai-guard.json")
+    )) {
+        if (Test-Path $candidate) {
+            $ConfigPath = $candidate
+            break
+        }
     }
 }
 
@@ -695,13 +721,19 @@ function Set-InputTheme {
     $Control.ForeColor = [System.Drawing.Color]::FromArgb(27, 39, 53)
 }
 
+$brandLogoPath = Get-BrandAssetPath -LeafName "logo.png"
+$brandIconPath = Get-BrandAssetPath -LeafName "logo.ico"
+
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "AI Guard Agent Admin Console"
+$form.Text = "Ulti Guard Agent Admin Console"
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
 $form.Size = New-Object System.Drawing.Size(1080, 720)
 $form.MinimumSize = New-Object System.Drawing.Size(1080, 720)
 $form.BackColor = [System.Drawing.Color]::FromArgb(239, 242, 247)
 $form.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+if ($brandIconPath) {
+    $form.Icon = New-Object System.Drawing.Icon($brandIconPath)
+}
 
 $heroPanel = New-Object System.Windows.Forms.Panel
 $heroPanel.Location = New-Object System.Drawing.Point(18, 16)
@@ -709,19 +741,29 @@ $heroPanel.Size = New-Object System.Drawing.Size(1028, 132)
 $heroPanel.BackColor = [System.Drawing.Color]::FromArgb(16, 35, 59)
 $form.Controls.Add($heroPanel)
 
+if ($brandLogoPath) {
+    $heroLogo = New-Object System.Windows.Forms.PictureBox
+    $heroLogo.Location = New-Object System.Drawing.Point(24, 28)
+    $heroLogo.Size = New-Object System.Drawing.Size(160, 68)
+    $heroLogo.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+    $heroLogo.BackColor = [System.Drawing.Color]::Transparent
+    $heroLogo.Image = [System.Drawing.Image]::FromFile($brandLogoPath)
+    $heroPanel.Controls.Add($heroLogo)
+}
+
 $heroEyebrow = New-Object System.Windows.Forms.Label
 $heroEyebrow.Text = "WIN INFOSOFT · ENTERPRISE CONTROL"
 $heroEyebrow.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 9)
 $heroEyebrow.ForeColor = [System.Drawing.Color]::FromArgb(242, 177, 140)
-$heroEyebrow.Location = New-Object System.Drawing.Point(24, 18)
+$heroEyebrow.Location = New-Object System.Drawing.Point(196, 18)
 $heroEyebrow.AutoSize = $true
 $heroPanel.Controls.Add($heroEyebrow)
 
 $title = New-Object System.Windows.Forms.Label
-$title.Text = "AI Guard Agent Admin Console"
+$title.Text = "Ulti Guard Agent Admin Console"
 $title.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 22, [System.Drawing.FontStyle]::Bold)
 $title.ForeColor = [System.Drawing.Color]::White
-$title.Location = New-Object System.Drawing.Point(22, 38)
+$title.Location = New-Object System.Drawing.Point(194, 38)
 $title.AutoSize = $true
 $heroPanel.Controls.Add($title)
 
@@ -729,8 +771,8 @@ $subtitle = New-Object System.Windows.Forms.Label
 $subtitle.Text = "Manage blocked providers, enforce browser policy, and keep Claude-only protection tight without exposing controls to standard users."
 $subtitle.Font = New-Object System.Drawing.Font("Segoe UI", 10)
 $subtitle.ForeColor = [System.Drawing.Color]::FromArgb(221, 229, 238)
-$subtitle.Location = New-Object System.Drawing.Point(26, 82)
-$subtitle.Size = New-Object System.Drawing.Size(700, 34)
+$subtitle.Location = New-Object System.Drawing.Point(198, 82)
+$subtitle.Size = New-Object System.Drawing.Size(528, 34)
 $heroPanel.Controls.Add($subtitle)
 
 $installModeBadge = New-Object System.Windows.Forms.Label
@@ -1004,7 +1046,7 @@ function Save-And-Apply {
     $statusLabel.Text = "Saved. $result"
     [System.Windows.Forms.MessageBox]::Show(
         "Provider settings were saved successfully.`r`n`r`nBrowser URL block policy was updated. Incognito/InPrivate remain enabled, but blocked providers stay denied by browser policy.`r`n`r`n$result",
-        "AI Guard Agent",
+        "Ulti Guard Agent",
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Information
     ) | Out-Null
@@ -1013,12 +1055,12 @@ function Save-And-Apply {
 function Change-AdminConsolePassword {
     $changed = Set-AdminConsolePassword `
         -PromptTitle "Change Admin Console Password" `
-        -PromptMessage "Enter a new password for AI Guard Agent Admin Console."
+        -PromptMessage "Enter a new password for Ulti Guard Agent Admin Console."
     if ($changed) {
         $statusLabel.Text = "Admin console password updated."
         [System.Windows.Forms.MessageBox]::Show(
             "Admin console password was updated successfully.",
-            "AI Guard Agent",
+            "Ulti Guard Agent",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Information
         ) | Out-Null

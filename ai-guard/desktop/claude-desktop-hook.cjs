@@ -83,7 +83,7 @@ function loadBridgeConfig() {
     return parsed;
   } catch (error) {
     console.error(
-      "AI Guard Agent: failed to load Claude Desktop bridge config",
+      "Ulti Guard Agent: failed to load Claude Desktop bridge config",
       error,
     );
     return null;
@@ -187,7 +187,7 @@ function onKeyDown(event) {
   stopEvent(event);
   handleSubmit(editor).catch((error) => {
     console.error(
-      "AI Guard Agent: Claude Desktop submit interception failed",
+      "Ulti Guard Agent: Claude Desktop submit interception failed",
       error,
     );
     showWarning("Claude Desktop prompt guard failed");
@@ -214,7 +214,7 @@ function onClick(event) {
   stopEvent(event);
   handleSubmit(editor).catch((error) => {
     console.error(
-      "AI Guard Agent: Claude Desktop click submit interception failed",
+      "Ulti Guard Agent: Claude Desktop click submit interception failed",
       error,
     );
     showWarning("Claude Desktop prompt guard failed");
@@ -611,7 +611,7 @@ function desktopBridgeRequest(routePath, options) {
 }
 
 function showWarning(message) {
-  const text = message || "AI Guard Agent blocked this Claude Desktop prompt.";
+  const text = message || "Ulti Guard Agent blocked this Claude Desktop prompt.";
   let toast = document.getElementById(WARNING_ID);
   if (!toast) {
     toast = document.createElement("div");
@@ -635,7 +635,7 @@ function showWarning(message) {
     document.documentElement.appendChild(toast);
   }
 
-  toast.textContent = `AI Guard Agent: ${text}`;
+  toast.textContent = `Ulti Guard Agent: ${text}`;
   positionWarningToast(toast);
   window.clearTimeout(showWarning.timerId);
   showWarning.timerId = window.setTimeout(() => {

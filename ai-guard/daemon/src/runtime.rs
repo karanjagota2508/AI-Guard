@@ -67,7 +67,7 @@ pub async fn run(config: AppConfig, shutdown: impl Future<Output = ()> + Send) -
     let http_cancel = cancel.clone();
     let managed_pii_config = state.config.managed_pii.clone().filter(|item| item.enabled);
 
-    info!(listen = %listen_addr, "starting AI Guard Agent daemon");
+    info!(listen = %listen_addr, "starting Ulti Guard Agent daemon");
     let mut server_handle = tokio::spawn(async move {
         axum::serve(listener, router)
             .with_graceful_shutdown(http_cancel.cancelled_owned())

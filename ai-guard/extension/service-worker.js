@@ -61,7 +61,7 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
       await evaluateTab(tabId, tab.url);
     }
   } catch (error) {
-    console.error("AI Guard activation check failed", error);
+    console.error("Ulti Guard activation check failed", error);
   }
 });
 
@@ -84,7 +84,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({
           action: "block",
           redacted_text: "",
-          reason: `AI Guard Agent is unavailable: ${error.message}`,
+          reason: `Ulti Guard Agent is unavailable: ${error.message}`,
         }),
       );
     return true;
@@ -194,7 +194,7 @@ async function refreshStatus(force = false) {
     const status = await daemonFetch("/status");
     applyStatus(status);
   } catch (error) {
-    console.warn("AI Guard status refresh failed", error);
+    console.warn("Ulti Guard status refresh failed", error);
   }
 
   return snapshot();
@@ -237,7 +237,7 @@ async function syncClaudePresence({ force = false } = {}) {
       });
       applyStatus(status);
     } catch (error) {
-      console.warn("AI Guard Claude presence sync failed", error);
+      console.warn("Ulti Guard Claude presence sync failed", error);
     }
 
     return snapshot();

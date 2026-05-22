@@ -15,7 +15,9 @@ function Resolve-InstallRoot {
         $candidates += $Preferred
     }
     $candidates += @(
+        "$env:ProgramFiles\Ulti Guard Agent",
         "$env:ProgramFiles\AI Guard Agent",
+        "$env:LOCALAPPDATA\Ulti Guard Agent",
         "$env:LOCALAPPDATA\AI Guard Agent"
     )
 
@@ -25,7 +27,7 @@ function Resolve-InstallRoot {
         }
     }
 
-    throw "AI Guard Agent install root not found. Pass -InstallRoot explicitly."
+    throw "Ulti Guard Agent install root not found. Pass -InstallRoot explicitly."
 }
 
 function Write-Utf8NoBomFile {
@@ -96,7 +98,7 @@ function Restart-DesktopHelper {
 
     Start-Process `
         -FilePath "powershell.exe" `
-        -ArgumentList "-NoProfile -ExecutionPolicy Bypass -STA -File `"$HelperPath`" -ConfigPath `"$ConfigPath`" -PollMs 300" `
+        -ArgumentList "-NoProfile -ExecutionPolicy RemoteSigned -STA -File `"$HelperPath`" -ConfigPath `"$ConfigPath`" -PollMs 300" `
         -WindowStyle Hidden | Out-Null
 }
 
@@ -128,18 +130,18 @@ Restart-DesktopHelper -HelperPath $installedHelperPath -ConfigPath $configPath
 if ($RelaunchClaude -and (Test-Path $launcherPath)) {
     Get-Process claude -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 900
-    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$launcherPath`"" | Out-Null
+    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy RemoteSigned -File `"$launcherPath`"" | Out-Null
 }
 
 Write-Host ""
-Write-Host "AI Guard Agent Claude Desktop notification fix applied."
+Write-Host "Ulti Guard Agent Claude Desktop notification fix applied."
 Write-Host "Install root : $resolvedInstallRoot"
 Write-Host "Hook source  : $hookSource"
 Write-Host "Helper source: $helperSource"
 Write-Host "Config       : $configPath"
 Write-Host ""
 if ($RelaunchClaude) {
-    Write-Host "Claude Desktop was relaunched through the AI Guard launcher."
+    Write-Host "Claude Desktop was relaunched through the Ulti Guard launcher."
 } else {
     Write-Host "If Claude Desktop is open, close it and reopen through launch-claude-desktop.ps1 for a clean test."
 }

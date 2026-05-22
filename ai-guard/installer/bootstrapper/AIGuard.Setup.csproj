@@ -6,12 +6,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <AssemblyName>AI-Guard-Setup</AssemblyName>
-    <RootNamespace>AIGuardSetup</RootNamespace>
+    <AssemblyName>Ulti-Guard-Setup</AssemblyName>
+    <RootNamespace>UltiGuardSetup</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>brand-icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="payload.zip" LogicalName="AIGuardSetup.Payload.zip" />
+    <EmbeddedResource Include="payload.zip" LogicalName="UltiGuardSetup.Payload.zip" />
+    <EmbeddedResource Include="brand-logo.png" LogicalName="UltiGuardSetup.BrandLogo.png" />
+    <EmbeddedResource Include="brand-icon.ico" LogicalName="UltiGuardSetup.BrandIcon.ico" />
+    <EmbeddedResource Include="..\install.ps1" LogicalName="UltiGuardSetup.Scripts.install.ps1" />
+    <EmbeddedResource Include="..\uninstall.ps1" LogicalName="UltiGuardSetup.Scripts.uninstall.ps1" />
   </ItemGroup>
 </Project>

@@ -1,9 +1,22 @@
 param(
-    [string]$InstallRoot = "$env:ProgramFiles\AI Guard Agent",
+    [string]$InstallRoot = "$env:ProgramFiles\Ulti Guard Agent",
     [switch]$KeepFiles
 )
 
 $ErrorActionPreference = "Stop"
+
+$InstallerScriptRoot = if ($PSScriptRoot) {
+    $PSScriptRoot
+} elseif ($env:ULTI_GUARD_INSTALLER_ROOT) {
+    $env:ULTI_GUARD_INSTALLER_ROOT
+} elseif ($PSCommandPath) {
+    Split-Path $PSCommandPath -Parent
+} else {
+    (Get-Location).Path
+}
+
+$legacyMachineInstallRoot = "$env:ProgramFiles\AI Guard Agent"
+$legacyUserInstallRoot = Join-Path $env:LOCALAPPDATA "AI Guard Agent"
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -59,11 +72,19 @@ function Stop-ProcessesByCommandLinePattern {
     }
 }
 
-. (Join-Path $PSScriptRoot "scripts\browser-policies.ps1")
+. (Join-Path $InstallerScriptRoot "scripts\browser-policies.ps1")
 
 $isAdmin = Test-IsAdministrator
 if (-not $isAdmin -and $InstallRoot.StartsWith($env:ProgramFiles, [System.StringComparison]::OrdinalIgnoreCase)) {
-    $InstallRoot = Join-Path $env:LOCALAPPDATA "AI Guard Agent"
+    $InstallRoot = Join-Path $env:LOCALAPPDATA "Ulti Guard Agent"
+}
+
+if (-not (Test-Path $InstallRoot)) {
+    if ($isAdmin -and (Test-Path $legacyMachineInstallRoot)) {
+        $InstallRoot = $legacyMachineInstallRoot
+    } elseif (-not $isAdmin -and (Test-Path $legacyUserInstallRoot)) {
+        $InstallRoot = $legacyUserInstallRoot
+    }
 }
 
 $registryHives = if ($isAdmin) {
@@ -76,9 +97,9 @@ $registryHives = if ($isAdmin) {
 }
 
 $serviceName = "AIGuardAgent"
-$machineAdminConsoleShortcut = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Guard Agent Admin Console.lnk"
-$userAdminConsoleShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "AI Guard Agent Admin Console.lnk"
-$claudePatchScript = Join-Path $PSScriptRoot "scripts\patch-claude-desktop.ps1"
+$machineAdminConsoleShortcut = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\Ulti Guard Agent Admin Console.lnk"
+$userAdminConsoleShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "Ulti Guard Agent Admin Console.lnk"
+$claudePatchScript = Join-Path $InstallerScriptRoot "scripts\patch-claude-desktop.ps1"
 if ($isAdmin) {
     if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
         Stop-Service -Name $serviceName -ErrorAction SilentlyContinue
@@ -132,4 +153,4 @@ if (-not $KeepFiles -and (Test-Path $InstallRoot)) {
     Remove-Item -Path $InstallRoot -Recurse -Force
 }
 
-Write-Host "AI Guard Agent removed. Restart Chrome and Edge to clear extension policy state."
+Write-Host "Ulti Guard Agent removed. Restart Chrome and Edge to clear extension policy state."

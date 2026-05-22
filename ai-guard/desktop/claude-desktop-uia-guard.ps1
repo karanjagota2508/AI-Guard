@@ -38,7 +38,7 @@ if (-not $createdNew) {
 
 try {
     if (-not (Test-Path $ConfigPath)) {
-        throw "AI Guard config not found at $ConfigPath"
+        throw "Ulti Guard config not found at $ConfigPath"
     }
 
     $config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
@@ -236,9 +236,9 @@ try {
         )
 
         $text = if ([string]::IsNullOrWhiteSpace($Message)) {
-            "AI Guard Agent blocked this Claude Desktop prompt."
+            "Ulti Guard Agent blocked this Claude Desktop prompt."
         } else {
-            "AI Guard Agent: $Message"
+            "Ulti Guard Agent: $Message"
         }
 
         $key = if ([string]::IsNullOrWhiteSpace($DedupKey)) { $text } else { $DedupKey }
@@ -328,7 +328,7 @@ public static class AiGuardToastNativeMethods {
         $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($toastScript))
         Start-Process `
             -FilePath "powershell.exe" `
-            -ArgumentList "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -EncodedCommand $encoded" `
+            -ArgumentList "-NoProfile -ExecutionPolicy RemoteSigned -STA -WindowStyle Hidden -EncodedCommand $encoded" `
             -WindowStyle Hidden | Out-Null
     }
 

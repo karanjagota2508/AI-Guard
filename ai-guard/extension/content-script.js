@@ -528,7 +528,7 @@ function showWarning(message) {
     document.body.appendChild(banner);
   }
 
-  banner.textContent = `AI Guard Agent: ${message}`;
+  banner.textContent = `Ulti Guard Agent: ${message}`;
   banner.style.opacity = "1";
   window.clearTimeout(showWarning.timerId);
   showWarning.timerId = window.setTimeout(() => {

@@ -1,5 +1,5 @@
 param(
-    [string]$OutputPath = (Join-Path (Split-Path $PSScriptRoot -Parent) "dist\AI-Guard-Setup.exe"),
+    [string]$OutputPath = (Join-Path (Split-Path $PSScriptRoot -Parent) "dist\Ulti-Guard-Setup.exe"),
     [string]$Runtime = "win-x64",
     [switch]$IncludeWheelhouse
 )
@@ -86,10 +86,8 @@ if (-not (Test-Path (Join-Path $installerRoot "dist\ai-guard-daemon.exe"))) {
     throw "Missing prebuilt daemon binary at installer\dist\ai-guard-daemon.exe. Build or copy it first."
 }
 
-if (-not (Test-Path (Join-Path $installerRoot "dist\ai-guard-extension.crx"))) {
-    throw "Missing packaged extension at installer\dist\ai-guard-extension.crx. Build or copy it first."
-}
-
+& (Join-Path $repoRoot "branding\generate-brand-assets.ps1")
+& (Join-Path $installerRoot "scripts\package-extension.ps1") -OutputPath (Join-Path $installerRoot "dist\ai-guard-extension.crx")
 & (Join-Path $PSScriptRoot "build-python-runtime.ps1")
 if ($IncludeWheelhouse) {
     & (Join-Path $PSScriptRoot "build-pii-wheelhouse.ps1")
@@ -105,6 +103,7 @@ try {
 
     New-Item -ItemType Directory -Force -Path $stageAiGuardRoot, $stageInstallerRoot, $stagePiiRoot | Out-Null
 
+    Copy-DirectoryFiltered -Source (Join-Path $repoRoot "branding") -Destination (Join-Path $stageAiGuardRoot "branding")
     Copy-DirectoryFiltered -Source (Join-Path $repoRoot "config") -Destination (Join-Path $stageAiGuardRoot "config")
     Copy-DirectoryFiltered -Source (Join-Path $repoRoot "desktop") -Destination (Join-Path $stageAiGuardRoot "desktop")
     Copy-DirectoryFiltered -Source (Join-Path $repoRoot "extension") -Destination (Join-Path $stageAiGuardRoot "extension")
@@ -113,10 +112,6 @@ try {
         -Source (Join-Path $installerRoot "dist") `
         -Destination (Join-Path $stageInstallerRoot "dist") `
         -ExcludedDirectoryNames $(if ($IncludeWheelhouse) { @() } else { @("pii-wheelhouse") })
-
-    Copy-FileEnsureParent -Source (Join-Path $installerRoot "install.ps1") -Destination (Join-Path $stageInstallerRoot "install.ps1")
-    Copy-FileEnsureParent -Source (Join-Path $installerRoot "install-enterprise.ps1") -Destination (Join-Path $stageInstallerRoot "install-enterprise.ps1")
-    Copy-FileEnsureParent -Source (Join-Path $installerRoot "uninstall.ps1") -Destination (Join-Path $stageInstallerRoot "uninstall.ps1")
 
     Copy-DirectoryFiltered `
         -Source (Join-Path $workspaceRoot "PII_agent\backend") `
@@ -141,8 +136,8 @@ try {
         -p:IncludeNativeLibrariesForSelfExtract=true
 
     New-Item -ItemType Directory -Force -Path (Split-Path $OutputPath -Parent) | Out-Null
-    Copy-Item -LiteralPath (Join-Path $publishDir "AI-Guard-Setup.exe") -Destination $OutputPath -Force
-    Write-Host "Built AI Guard setup executable at $OutputPath"
+    Copy-Item -LiteralPath (Join-Path $publishDir "Ulti-Guard-Setup.exe") -Destination $OutputPath -Force
+    Write-Host "Built Ulti Guard setup executable at $OutputPath"
 }
 finally {
     if (Test-Path $stageRoot) {

@@ -19,7 +19,7 @@ use crate::config::{AppConfig, default_config_path};
 
 #[derive(Debug, Parser)]
 #[command(name = "ai-guard-daemon")]
-#[command(about = "AI Guard Agent local enforcement daemon")]
+#[command(about = "Ulti Guard Agent local enforcement daemon")]
 struct Cli {
     #[arg(long, default_value_os_t = default_config_path())]
     config: PathBuf,

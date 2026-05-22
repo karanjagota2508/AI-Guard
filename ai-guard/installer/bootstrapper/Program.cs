@@ -1,6 +1,6 @@
 using System.Windows.Forms;
 
-namespace AIGuardSetup;
+namespace UltiGuardSetup;
 
 internal static class Program
 {

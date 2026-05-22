@@ -164,7 +164,7 @@ impl IntoResponse for ApiError {
         (
             self.status,
             Html(format!(
-                "<html><body><h1>AI Guard Agent</h1><p>{}</p></body></html>",
+                "<html><body><h1>Ulti Guard Agent</h1><p>{}</p></body></html>",
                 self.message
             )),
         )

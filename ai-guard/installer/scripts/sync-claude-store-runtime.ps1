@@ -1,7 +1,7 @@
 param(
     [string]$ConfigPath = "",
     [string]$HookSourcePath = "",
-    [string]$TargetRoot = "$env:LOCALAPPDATA\AI Guard Agent\claude-desktop",
+    [string]$TargetRoot = "$env:LOCALAPPDATA\Ulti Guard Agent\claude-desktop",
     [string]$LauncherScriptPath = "",
     [string]$PatchScriptPath = "",
     [string]$UiaGuardScriptPath = "",
@@ -112,7 +112,7 @@ function Write-Utf8NoBomFile {
 }
 
 if (-not (Test-Path $ConfigPath)) {
-    throw "AI Guard config not found at $ConfigPath"
+    throw "Ulti Guard config not found at $ConfigPath"
 }
 
 if (-not (Test-Path $HookSourcePath)) {
@@ -125,7 +125,7 @@ if (-not (Test-Path $PatchScriptPath)) {
 
 $sourceAppPath = Get-StoreClaudeAppPath -Root $StoreAppsRoot
 if (-not $sourceAppPath) {
-    Write-Host "AI Guard Agent: no WindowsApps Claude Desktop package found under $StoreAppsRoot"
+    Write-Host "Ulti Guard Agent: no WindowsApps Claude Desktop package found under $StoreAppsRoot"
     return
 }
 
@@ -154,7 +154,7 @@ if ('$UiaGuardScriptPath' -and (Test-Path '$UiaGuardScriptPath')) {
     } |
     Select-Object -First 1
   if (-not `$existing) {
-    `$helperArgs = "-NoProfile -ExecutionPolicy Bypass -STA -File ``"$UiaGuardScriptPath``" -ConfigPath ``"$ConfigPath``" -PollMs 300"
+    `$helperArgs = "-NoProfile -ExecutionPolicy RemoteSigned -STA -File ``"$UiaGuardScriptPath``" -ConfigPath ``"$ConfigPath``" -PollMs 300"
     Start-Process -FilePath 'powershell.exe' -ArgumentList `$helperArgs -WindowStyle Hidden
     Start-Sleep -Milliseconds 750
   }
@@ -164,7 +164,7 @@ Start-Process -FilePath '$storeExePath' -ArgumentList '--force-renderer-accessib
     Write-Utf8NoBomFile -Path $LauncherScriptPath -Content $launcherContent
 }
 
-Write-Host "AI Guard Agent: synced WindowsApps Claude Desktop -> $targetAppRoot"
+Write-Host "Ulti Guard Agent: synced WindowsApps Claude Desktop -> $targetAppRoot"
 
 if ($Launch -and (Test-Path $storeExePath)) {
     Start-Process -FilePath $storeExePath -ArgumentList "--force-renderer-accessibility" -WorkingDirectory (Split-Path $storeExePath -Parent)

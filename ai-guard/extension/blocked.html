@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AI Guard Agent</title>
+    <title>Ulti Guard Agent</title>
     <style>
       :root {
         color-scheme: light;
@@ -33,6 +33,31 @@
         border-radius: 22px;
         background: rgba(255, 255, 255, 0.9);
         box-shadow: 0 25px 80px rgba(159, 18, 57, 0.12);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 22px;
+      }
+
+      .brand img {
+        width: 92px;
+        height: auto;
+        display: block;
+      }
+
+      .brand-copy {
+        display: grid;
+        gap: 2px;
+      }
+
+      .brand-copy strong {
+        font-size: 14px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--warn);
       }
 
       h1 {
@@ -71,10 +96,17 @@
   </head>
   <body>
     <main>
+      <div class="brand">
+        <img src="assets/logo.png" alt="Ulti Guard Agent">
+        <div class="brand-copy">
+          <strong>Ulti Guard Agent</strong>
+          <span>Managed browser enforcement is active.</span>
+        </div>
+      </div>
       <div class="badge">Guard Active</div>
       <h1>Another LLM was blocked while Claude is active.</h1>
       <p>
-        AI Guard Agent restricts competing LLM sites during protected Claude sessions.
+        Ulti Guard Agent restricts competing LLM sites during protected Claude sessions.
         Close Claude or wait for guard mode to return to idle before reopening this site.
       </p>
       <p>Blocked destination:</p>

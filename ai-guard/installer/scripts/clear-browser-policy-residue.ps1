@@ -45,4 +45,4 @@ if ($RemoveCurrentUserUrlBlocklistKeys) {
     Remove-RegistryKeyIfPresent -Hive ([Microsoft.Win32.RegistryHive]::CurrentUser) -KeyPath "SOFTWARE\Policies\Microsoft\Edge\URLBlocklist"
 }
 
-Write-Host "AI Guard browser policy residue cleanup completed. Fully restart Chrome and Edge, then reload chrome://policy and edge://policy."
+Write-Host "Ulti Guard browser policy residue cleanup completed. Fully restart Chrome and Edge, then reload chrome://policy and edge://policy."

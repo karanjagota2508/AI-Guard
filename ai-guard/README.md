@@ -1,6 +1,6 @@
-# AI Guard Agent
+# Ulti Guard Agent
 
-AI Guard Agent is a Windows-first single-install security product that enforces protected Claude usage. One installation deploys:
+Ulti Guard Agent is a Windows-first single-install security product that enforces protected Claude usage. One installation deploys:
 
 - A Rust background daemon with a localhost API bridge
 - A managed local PII engine based on the bundled `PII_agent` FastAPI service
@@ -29,8 +29,8 @@ ai-guard/
 - Claude prompts are scanned on paste, debounced input, and submit only.
 - Submit-time scan decisions return `allow`, `redact`, or `block`.
 - The daemon can supervise the bundled PII backend and restart it if it stops responding.
-- If Claude Desktop is installed from the Microsoft Store, AI Guard mirrors the package into a writable local runtime and patches that guarded copy instead of the read-only `WindowsApps` bundle.
-- For Microsoft Store Claude builds, AI Guard launches the signed package with Chromium accessibility enabled and applies prompt redaction through an external UIAutomation helper.
+- If Claude Desktop is installed from the Microsoft Store, Ulti Guard mirrors the package into a writable local runtime and patches that guarded copy instead of the read-only `WindowsApps` bundle.
+- For Microsoft Store Claude builds, Ulti Guard launches the signed package with Chromium accessibility enabled and applies prompt redaction through an external UIAutomation helper.
 
 ## What You Can Do With It
 
@@ -43,7 +43,7 @@ ai-guard/
 - Run a fully local PII pipeline with Presidio-based detection and anonymization.
 - Force-install the browser extension for Chrome and Edge through policy.
 - Permanently block configured competing provider websites through Chrome and Edge browser policy, not only through extension tab interception, while still allowing private browsing.
-- Deploy one install under `C:\Program Files\AI Guard Agent` instead of managing separate pieces manually.
+- Deploy one install under `C:\Program Files\Ulti Guard Agent` instead of managing separate pieces manually.
 - Let administrators manage blocked providers through a local desktop admin console instead of editing JSON manually.
 
 ## Local API
@@ -122,18 +122,18 @@ If you want a no-command setup for end users or IT operators, build the single-f
 To build the larger fully offline setup that also bundles the PII dependency wheelhouse:
 
 ```powershell
-.\installer\scripts\build-setup-exe.ps1 -IncludeWheelhouse -OutputPath .\artifacts\AI-Guard-Setup-offline.exe
+.\installer\scripts\build-setup-exe.ps1 -IncludeWheelhouse -OutputPath .\artifacts\Ulti-Guard-Setup-offline.exe
 ```
 
 That produces:
 
-- `installer/dist/AI-Guard-Setup.exe`
+- `installer/dist/Ulti-Guard-Setup.exe`
 
 The setup executable:
 
 - requests administrator approval automatically
 - shows a simple Install / Repair / Uninstall GUI
-- extracts the bundled AI Guard + PII payload to a temporary folder
+- extracts the bundled Ulti Guard + PII payload to a temporary folder
 - bundles a private Python runtime for the managed PII backend
 - can optionally bundle a local wheelhouse so the PII backend provisions fully offline
 - runs `install-enterprise.ps1 -SkipBuild` internally
@@ -145,22 +145,22 @@ The installer:
 - Builds the daemon release binary
 - Packs the MV3 extension as a CRX with a fixed extension ID
 - Copies and provisions the bundled `PII_agent/backend` into a private virtual environment
-- Writes `C:\Program Files\AI Guard Agent\config\ai-guard.json`
+- Writes `C:\Program Files\Ulti Guard Agent\config\ai-guard.json`
 - Copies the Claude Desktop hook and patches detected `%LOCALAPPDATA%\AnthropicClaude\app-*\resources\app.asar` bundles
 - Detects Microsoft Store Claude installs under `C:\Program Files\WindowsApps\Claude_*`, mirrors them into a writable local runtime, and generates a guarded launcher script
-- Generates a Claude Desktop launcher that starts the Store build with `--force-renderer-accessibility` and runs the AI Guard UIAutomation helper
+- Generates a Claude Desktop launcher that starts the Store build with `--force-renderer-accessibility` and runs the Ulti Guard UIAutomation helper
 - Installs an elevated `launch-admin-console.ps1` entry point for provider management
 - Registers the daemon as the `AIGuardAgent` Windows service
 - Registers Chrome and Edge native messaging manifests
 - Applies Chrome and Edge managed extension policies without overwriting unrelated org policy entries
 - Registers both `ExtensionSettings` and `ExtensionInstallForcelist` entries for the fixed extension ID
 - Can enforce blocked provider domains through Chrome and Edge `URLBlocklist`
-- Can keep Chrome Incognito and Edge InPrivate enabled while requiring AI Guard for private navigation and still blocking configured provider domains through browser policy
+- Can keep Chrome Incognito and Edge InPrivate enabled while requiring Ulti Guard for private navigation and still blocking configured provider domains through browser policy
 - Can optionally block other extensions, disable extensions-page developer mode, and disable browser developer tools
 
 Restart Chrome and Edge after installation so policy refresh and extension installation happen immediately.
 Restart Claude Desktop after installation if it was open during setup. The installer backs up each original `app.asar` as `app.asar.ai-guard.bak` and the uninstaller restores it.
-If Claude Desktop came from the Microsoft Store, launch it through `launch-claude-desktop.ps1` in the install root so AI Guard can enable the accessibility-based desktop guard path.
+If Claude Desktop came from the Microsoft Store, launch it through `launch-claude-desktop.ps1` in the install root so Ulti Guard can enable the accessibility-based desktop guard path.
 
 If you run the installer without elevation, the daemon installs for the current user only. In that mode the browser extension is copied locally, but Chromium will not be force-managed. Load `extension/` unpacked for development or use the elevated install path for managed rollout.
 
@@ -179,7 +179,7 @@ For extension debugging, load `extension/` as an unpacked extension. The fixed m
 
 Use this model when users must not disable or uninstall the extension:
 
-1. Install AI Guard Agent from an elevated PowerShell session so the daemon runs as a Windows service under `C:\Program Files\AI Guard Agent`.
+1. Install Ulti Guard Agent from an elevated PowerShell session so the daemon runs as a Windows service under `C:\Program Files\Ulti Guard Agent`.
 2. Apply browser policy at machine scope, not per-user scope.
 3. Force-install the extension with `installation_mode = force_installed`.
 4. Keep the extension ID fixed so native messaging allowlists remain valid.
@@ -189,18 +189,18 @@ Use this model when users must not disable or uninstall the extension:
 
 Machine installs now include an administrator-only Windows desktop console at:
 
-- `C:\Program Files\AI Guard Agent\launch-admin-console.ps1`
-- Start Menu: `AI Guard Agent Admin Console`
+- `C:\Program Files\Ulti Guard Agent\launch-admin-console.ps1`
+- Start Menu: `Ulti Guard Agent Admin Console`
 
 The console lets an administrator:
 
 - Add or remove blocked website hosts
 - Add or remove blocked desktop process names
 - Apply preset providers such as ChatGPT, Gemini, Perplexity, Grok, Cursor, Ollama, and LM Studio
-- Save the updated config and restart the AI Guard service
+- Save the updated config and restart the Ulti Guard service
 - Set an admin-console password on first launch and require that password on every future launch
 
-Standard users cannot use this console without administrator approval. For enterprise rollout, keep the install under `C:\Program Files\AI Guard Agent` and do not grant end users local admin rights.
+Standard users cannot use this console without administrator approval. For enterprise rollout, keep the install under `C:\Program Files\Ulti Guard Agent` and do not grant end users local admin rights.
 
 Recommended hardening switches:
 
@@ -208,17 +208,17 @@ Recommended hardening switches:
 - `-AllowedExtensionIds` keeps required corporate extensions allowed.
 - `-DisallowExtensionDeveloperMode` prevents turning on extensions-page developer mode.
 - `-DisableBrowserDeveloperTools` disables built-in browser developer tools entirely.
-- `-MinimumExtensionVersion` enforces a minimum AI Guard extension version.
+- `-MinimumExtensionVersion` enforces a minimum Ulti Guard extension version.
 - `-ExtensionUpdateUrl` lets you point the force-install policy at a central HTTPS update manifest instead of `127.0.0.1`.
 - `-EnforceBrowserHostBlocklist` writes the configured provider host list into Chrome and Edge `URLBlocklist`.
-- `-RequirePrivateBrowsingGuard` keeps Incognito/InPrivate enabled but makes AI Guard mandatory before private navigation can proceed.
+- `-RequirePrivateBrowsingGuard` keeps Incognito/InPrivate enabled but makes Ulti Guard mandatory before private navigation can proceed.
 - `-DisablePrivateBrowsing` remains available only if you want to shut private browsing off entirely.
 
 Operational guidance:
 
 - For company rollout, prefer a central HTTPS-hosted `update.xml` and `.crx`, or publish the same fixed-ID package to the Chrome Web Store and Edge Add-ons.
-- The installer now merges AI Guard policy into existing `ExtensionSettings` rather than overwriting the whole organization policy blob.
-- Uninstall removes only AI Guard's managed-extension entries and preserves unrelated extension policies.
+- The installer now merges Ulti Guard policy into existing `ExtensionSettings` rather than overwriting the whole organization policy blob.
+- Uninstall removes only Ulti Guard's managed-extension entries and preserves unrelated extension policies.
 - The extension manifest remains configured with `"incognito": "split"`, and enterprise install uses browser policy for stronger enforcement: blocked provider sites are denied by `URLBlocklist`, while Incognito/InPrivate can stay enabled behind the browser's mandatory-extension gate.
 - Chrome still doesn't let admins silently make `Allow in Incognito` read-only and enabled for a force-installed extension.
 - Edge similarly does not expose a supported policy to force `Allow in InPrivate` on and read-only for a force-installed extension.
@@ -230,7 +230,7 @@ Operational guidance:
 - Browser-side web blocking only applies to Chrome and Edge profiles where the extension is installed.
 - The installed daemon can supervise the bundled PII backend on `127.0.0.1:8000`.
 - Claude Desktop auto-updates into new `app-*` folders. Re-run `installer\install.ps1` after a desktop app update so the new preload bundle gets patched.
-- Microsoft Store Claude updates replace the read-only package in `WindowsApps`. Re-run `installer\install.ps1` after a Store update so AI Guard refreshes its mirrored guarded runtime and launcher.
+- Microsoft Store Claude updates replace the read-only package in `WindowsApps`. Re-run `installer\install.ps1` after a Store update so Ulti Guard refreshes its mirrored guarded runtime and launcher.
 - Silent force-install of self-hosted extensions on Windows is intended for enterprise-managed Chromium browsers. See Chrome and Edge policy documentation:
   - https://support.google.com/chrome/a/answer/9867568?hl=en-gb
   - https://support.google.com/chrome/a/answer/6306504?hl=en

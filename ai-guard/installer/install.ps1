@@ -1,6 +1,6 @@
 param(
     [int]$PiiPort = 8000,
-    [string]$InstallRoot = "$env:ProgramFiles\AI Guard Agent",
+    [string]$InstallRoot = "$env:ProgramFiles\Ulti Guard Agent",
     [switch]$SkipBuild,
     [string]$ExtensionUpdateUrl = "http://127.0.0.1:48555/update.xml",
     [string]$MinimumExtensionVersion = "",
@@ -14,6 +14,16 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+$InstallerScriptRoot = if ($PSScriptRoot) {
+    $PSScriptRoot
+} elseif ($env:ULTI_GUARD_INSTALLER_ROOT) {
+    $env:ULTI_GUARD_INSTALLER_ROOT
+} elseif ($PSCommandPath) {
+    Split-Path $PSCommandPath -Parent
+} else {
+    (Get-Location).Path
+}
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -81,7 +91,8 @@ function New-ShortcutFile {
         [string]$TargetPath,
         [string]$Arguments = "",
         [string]$WorkingDirectory = "",
-        [string]$Description = ""
+        [string]$Description = "",
+        [string]$IconLocation = ""
     )
 
     $shortcutDir = Split-Path $ShortcutPath -Parent
@@ -99,10 +110,13 @@ function New-ShortcutFile {
     if ($Description) {
         $shortcut.Description = $Description
     }
+    if ($IconLocation) {
+        $shortcut.IconLocation = $IconLocation
+    }
     $shortcut.Save()
 }
 
-. (Join-Path $PSScriptRoot "scripts\browser-policies.ps1")
+. (Join-Path $InstallerScriptRoot "scripts\browser-policies.ps1")
 
 function Find-PythonExecutable {
     $candidates = @()
@@ -253,16 +267,17 @@ function Wait-ForHttpOk {
 $isAdmin = Test-IsAdministrator
 
 if (-not $isAdmin -and $InstallRoot.StartsWith($env:ProgramFiles, [System.StringComparison]::OrdinalIgnoreCase)) {
-    $InstallRoot = Join-Path $env:LOCALAPPDATA "AI Guard Agent"
+    $InstallRoot = Join-Path $env:LOCALAPPDATA "Ulti Guard Agent"
 }
 
 $registryHive = if ($isAdmin) { [Microsoft.Win32.RegistryHive]::LocalMachine } else { [Microsoft.Win32.RegistryHive]::CurrentUser }
 
-$repoRoot = Split-Path $PSScriptRoot -Parent
+$repoRoot = Split-Path $InstallerScriptRoot -Parent
 $daemonProject = Join-Path $repoRoot "daemon"
 $extensionManifestPath = Join-Path $repoRoot "extension\manifest.json"
 $daemonBinarySource = Join-Path $daemonProject "target\release\ai-guard-daemon.exe"
 $piiBackendSource = Join-Path (Split-Path $repoRoot -Parent) "PII_agent\backend"
+$brandingSource = Join-Path $repoRoot "branding"
 $distDir = Join-Path $repoRoot "installer\dist"
 $distDaemonBinary = Join-Path $distDir "ai-guard-daemon.exe"
 $distCrx = Join-Path $distDir "ai-guard-extension.crx"
@@ -284,7 +299,7 @@ if (-not $SkipBuild) {
     cargo build --release --manifest-path (Join-Path $daemonProject "Cargo.toml")
     New-Item -ItemType Directory -Force -Path $distDir | Out-Null
     Copy-Item -Path $daemonBinarySource -Destination $distDaemonBinary -Force
-    & (Join-Path $PSScriptRoot "scripts\package-extension.ps1") -OutputPath $distCrx
+    & (Join-Path $InstallerScriptRoot "scripts\package-extension.ps1") -OutputPath $distCrx
 }
 
 $daemonBinaryToInstall = $null
@@ -310,6 +325,7 @@ $installManifestDir = Join-Path $InstallRoot "manifests"
 $installPiiDir = Join-Path $InstallRoot "pii-agent"
 $installScriptsDir = Join-Path $InstallRoot "scripts"
 $installDesktopDir = Join-Path $InstallRoot "desktop"
+$installBrandingDir = Join-Path $InstallRoot "branding"
 $installedBinary = Join-Path $InstallRoot "ai-guard-daemon.exe"
 $installedConfig = Join-Path $installConfigDir "ai-guard.json"
 $installedCrx = Join-Path $installDistDir "ai-guard-extension.crx"
@@ -324,6 +340,7 @@ $adminConsoleScript = Join-Path $installScriptsDir "admin-console.ps1"
 $browserPoliciesScript = Join-Path $installScriptsDir "browser-policies.ps1"
 $installedClaudeHook = Join-Path $installDesktopDir "claude-desktop-hook.cjs"
 $installedClaudeUiaGuard = Join-Path $installDesktopDir "claude-desktop-uia-guard.ps1"
+$installedBrandIcon = Join-Path $installBrandingDir "logo.ico"
 $claudeLauncherScript = Join-Path $InstallRoot "launch-claude-desktop.ps1"
 $adminConsoleLauncher = Join-Path $InstallRoot "launch-admin-console.ps1"
 $startMenuPrograms = if ($isAdmin) {
@@ -331,17 +348,20 @@ $startMenuPrograms = if ($isAdmin) {
 } else {
     [Environment]::GetFolderPath("Programs")
 }
-$adminConsoleShortcut = Join-Path $startMenuPrograms "AI Guard Agent Admin Console.lnk"
+$adminConsoleShortcut = Join-Path $startMenuPrograms "Ulti Guard Agent Admin Console.lnk"
 
-New-Item -ItemType Directory -Force -Path $InstallRoot, $installConfigDir, $installDistDir, $installLogsDir, $installManifestDir, $installPiiDir, $installScriptsDir, $installDesktopDir | Out-Null
+New-Item -ItemType Directory -Force -Path $InstallRoot, $installConfigDir, $installDistDir, $installLogsDir, $installManifestDir, $installPiiDir, $installScriptsDir, $installDesktopDir, $installBrandingDir | Out-Null
 Copy-Item -Path $daemonBinaryToInstall -Destination $installedBinary -Force
 Copy-Item -Path $distCrx -Destination $installedCrx -Force
-Copy-Item -Path (Join-Path $PSScriptRoot "scripts\patch-claude-desktop.ps1") -Destination $patchClaudeDesktopScript -Force
-Copy-Item -Path (Join-Path $PSScriptRoot "scripts\sync-claude-store-runtime.ps1") -Destination $syncClaudeStoreRuntimeScript -Force
-Copy-Item -Path (Join-Path $PSScriptRoot "scripts\admin-console.ps1") -Destination $adminConsoleScript -Force
-Copy-Item -Path (Join-Path $PSScriptRoot "scripts\browser-policies.ps1") -Destination $browserPoliciesScript -Force
+Copy-Item -Path (Join-Path $InstallerScriptRoot "scripts\patch-claude-desktop.ps1") -Destination $patchClaudeDesktopScript -Force
+Copy-Item -Path (Join-Path $InstallerScriptRoot "scripts\sync-claude-store-runtime.ps1") -Destination $syncClaudeStoreRuntimeScript -Force
+Copy-Item -Path (Join-Path $InstallerScriptRoot "scripts\admin-console.ps1") -Destination $adminConsoleScript -Force
+Copy-Item -Path (Join-Path $InstallerScriptRoot "scripts\browser-policies.ps1") -Destination $browserPoliciesScript -Force
 Copy-Item -Path (Join-Path $repoRoot "desktop\claude-desktop-hook.cjs") -Destination $installedClaudeHook -Force
 Copy-Item -Path (Join-Path $repoRoot "desktop\claude-desktop-uia-guard.ps1") -Destination $installedClaudeUiaGuard -Force
+if (Test-Path $brandingSource) {
+    Copy-Item -Path (Join-Path $brandingSource "*") -Destination $installBrandingDir -Recurse -Force
+}
 $installedExtensionDir = Join-Path $InstallRoot "extension"
 if (Test-Path $installedExtensionDir) {
     Remove-Item -Path $installedExtensionDir -Recurse -Force
@@ -349,14 +369,14 @@ if (Test-Path $installedExtensionDir) {
 New-Item -ItemType Directory -Force -Path $installedExtensionDir | Out-Null
 Copy-Item -Path (Join-Path $repoRoot "extension\\*") -Destination $installedExtensionDir -Recurse -Force
 
-$venvPython = @(& (Join-Path $PSScriptRoot "scripts\provision-pii-agent.ps1") `
+$venvPython = @(& (Join-Path $InstallerScriptRoot "scripts\provision-pii-agent.ps1") `
     -SourceBackendDir $piiBackendSource `
     -InstallDir $installPiiDir `
     -PythonExecutable $pythonExecutable `
     -WheelhousePath $wheelhouseDir)
 $venvPython = ($venvPython | Select-Object -Last 1).Trim()
 
-& (Join-Path $PSScriptRoot "scripts\write-config.ps1") `
+& (Join-Path $InstallerScriptRoot "scripts\write-config.ps1") `
     -OutputPath $installedConfig `
     -PiiPort $PiiPort `
     -AuthToken $token `
@@ -392,7 +412,7 @@ $adminConsoleLauncherContent = @"
 
 $nativeManifestObject = @{
     name = "com.wininfosoft.ai_guard"
-    description = "AI Guard Agent native bootstrap host"
+    description = "Ulti Guard Agent native bootstrap host"
     path = $installedBinary
     type = "stdio"
     allowed_origins = @($origin)
@@ -483,7 +503,7 @@ if ($isAdmin) {
     New-Service `
         -Name $serviceName `
         -BinaryPathName $binaryPath `
-        -DisplayName "AI Guard Agent" `
+        -DisplayName "Ulti Guard Agent" `
         -Description "Protects Claude sessions, scans prompts for PII, and blocks competing LLM tools." `
         -StartupType Automatic | Out-Null
 
@@ -499,16 +519,17 @@ if (`$listener) { exit 0 }
 Start-Process -FilePath '$installedBinary' -ArgumentList '--config `"$installedConfig`" run' -WindowStyle Hidden
 "@
     [System.IO.File]::WriteAllText($launcherScript, $launcherScriptContent, (New-Object System.Text.UTF8Encoding($false)))
-    Set-RegistryStringValue -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -Name "AIGuardAgent" -Value "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$launcherScript`""
+    Set-RegistryStringValue -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -Name "AIGuardAgent" -Value "powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -WindowStyle Hidden -File `"$launcherScript`""
     Start-Process -FilePath $installedBinary -ArgumentList "--config `"$installedConfig`" run" -WindowStyle Hidden | Out-Null
 }
 
 New-ShortcutFile `
     -ShortcutPath $adminConsoleShortcut `
     -TargetPath "powershell.exe" `
-    -Arguments "-NoProfile -ExecutionPolicy Bypass -File `"$adminConsoleLauncher`"" `
+    -Arguments "-NoProfile -ExecutionPolicy RemoteSigned -File `"$adminConsoleLauncher`"" `
     -WorkingDirectory $InstallRoot `
-    -Description "Open the AI Guard Agent admin console."
+    -Description "Open the Ulti Guard Agent admin console." `
+    -IconLocation $installedBrandIcon
 
 Start-Sleep -Seconds 3
 
@@ -524,7 +545,7 @@ if ($isAdmin) {
 }
 
 Write-Host ""
-Write-Host "AI Guard Agent installed."
+Write-Host "Ulti Guard Agent installed."
 Write-Host "Scope        : $(if ($isAdmin) { 'machine' } else { 'current-user' })"
 Write-Host "Install root : $InstallRoot"
 Write-Host "PII engine   : http://127.0.0.1:$PiiPort/api/pii/detect"
@@ -549,7 +570,7 @@ if ($isAdmin) {
     if ($DisablePrivateBrowsing) {
         Write-Host "Chrome Incognito and Edge InPrivate were disabled to prevent users bypassing managed protections."
     } elseif ($RequirePrivateBrowsingGuard) {
-        Write-Host "Incognito/InPrivate stay enabled, but private navigation now requires AI Guard to remain allowed."
+        Write-Host "Incognito/InPrivate stay enabled, but private navigation now requires Ulti Guard to remain allowed."
     }
 } else {
     Write-Host "Current-user install does not force-enable the extension. Load the installed extension folder unpacked in Chrome/Edge:"

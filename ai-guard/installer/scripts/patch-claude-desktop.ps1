@@ -91,7 +91,7 @@ function Get-BridgeConfiguration {
     )
 
     if (-not (Test-Path $Path)) {
-        throw "AI Guard config not found at $Path"
+        throw "Ulti Guard config not found at $Path"
     }
 
     $config = Get-Content $Path -Raw | ConvertFrom-Json
@@ -231,7 +231,7 @@ function Restore-ClaudeDesktopVersion {
 
 $claudeVersions = @(Get-ClaudeResourceDirectories -Root $ClaudeRoot)
 if ($claudeVersions.Count -eq 0) {
-    Write-Host "AI Guard Agent: Claude Desktop not found under $ClaudeRoot"
+    Write-Host "Ulti Guard Agent: Claude Desktop not found under $ClaudeRoot"
     return
 }
 
@@ -265,5 +265,5 @@ try {
 }
 
 $results | ForEach-Object {
-    Write-Host "AI Guard Agent: Claude Desktop $($_.VersionName) -> $($_.Status)"
+    Write-Host "Ulti Guard Agent: Claude Desktop $($_.VersionName) -> $($_.Status)"
 }

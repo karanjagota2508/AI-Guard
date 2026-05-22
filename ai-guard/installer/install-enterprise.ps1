@@ -8,6 +8,16 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$InstallerScriptRoot = if ($PSScriptRoot) {
+    $PSScriptRoot
+} elseif ($env:ULTI_GUARD_INSTALLER_ROOT) {
+    $env:ULTI_GUARD_INSTALLER_ROOT
+} elseif ($PSCommandPath) {
+    Split-Path $PSCommandPath -Parent
+} else {
+    (Get-Location).Path
+}
+
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -26,7 +36,7 @@ if ($AllowedExtensionIds -contains 'your-corporate-extension-id') {
     throw "Replace the placeholder AllowedExtensionIds value with real extension IDs, or omit -AllowedExtensionIds."
 }
 
-$installScript = Join-Path $PSScriptRoot "install.ps1"
+$installScript = Join-Path $InstallerScriptRoot "install.ps1"
 if (-not (Test-Path $installScript)) {
     throw "Missing install script at $installScript"
 }
