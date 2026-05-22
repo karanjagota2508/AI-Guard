@@ -1,7 +1,13 @@
 param(
     [string]$OutputPath = (Join-Path (Split-Path $PSScriptRoot -Parent) "dist\Ulti-Guard-Setup.exe"),
     [string]$Runtime = "win-x64",
-    [switch]$IncludeWheelhouse
+    [switch]$IncludeWheelhouse,
+    [switch]$SkipSigning,
+    [string]$SigningThumbprint = "",
+    [string]$SigningPfxPath = "",
+    [string]$SigningPfxPassword = "",
+    [string]$SigningTimestampUrl = "",
+    [switch]$AutoSelectSigningCertificate
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,6 +25,11 @@ $payloadRoot = Join-Path $stageRoot "payload"
 $stageAiGuardRoot = Join-Path $payloadRoot "ai-guard"
 $stageInstallerRoot = Join-Path $stageAiGuardRoot "installer"
 $stagePiiRoot = Join-Path $payloadRoot "PII_agent"
+$stagePowerShellScripts = @()
+
+if (-not $AutoSelectSigningCertificate.IsPresent -and -not $SigningThumbprint -and -not $SigningPfxPath) {
+    $AutoSelectSigningCertificate = $true
+}
 
 function Copy-DirectoryFiltered {
     param(
@@ -93,6 +104,17 @@ if ($IncludeWheelhouse) {
     & (Join-Path $PSScriptRoot "build-pii-wheelhouse.ps1")
 }
 
+if (-not $SkipSigning) {
+    & (Join-Path $PSScriptRoot "sign-release-artifacts.ps1") `
+        -PortableExecutablePaths @((Join-Path $installerRoot "dist\ai-guard-daemon.exe")) `
+        -Thumbprint $SigningThumbprint `
+        -PfxPath $SigningPfxPath `
+        -PfxPassword $SigningPfxPassword `
+        -TimestampUrl $SigningTimestampUrl `
+        -AutoSelectCertificate:$AutoSelectSigningCertificate `
+        -SkipIfNoCertificate
+}
+
 try {
     if (Test-Path $payloadZip) {
         Remove-Item -Path $payloadZip -Force
@@ -119,6 +141,19 @@ try {
         -ExcludedDirectoryNames @(".venv", "venv", "__pycache__") `
         -ExcludedFilePatterns @("*.log")
 
+    $stagePowerShellScripts = @(
+        Get-ChildItem -Path $stageAiGuardRoot -Recurse -Filter *.ps1 -File | Select-Object -ExpandProperty FullName
+    )
+
+    if (-not $SkipSigning) {
+        & (Join-Path $PSScriptRoot "sign-release-artifacts.ps1") `
+            -PowerShellScriptPaths $stagePowerShellScripts `
+            -Thumbprint $SigningThumbprint `
+            -TimestampUrl $SigningTimestampUrl `
+            -AutoSelectCertificate:$AutoSelectSigningCertificate `
+            -SkipIfNoCertificate
+    }
+
     [System.IO.Compression.ZipFile]::CreateFromDirectory(
         $payloadRoot,
         $payloadZip,
@@ -137,6 +172,18 @@ try {
 
     New-Item -ItemType Directory -Force -Path (Split-Path $OutputPath -Parent) | Out-Null
     Copy-Item -LiteralPath (Join-Path $publishDir "Ulti-Guard-Setup.exe") -Destination $OutputPath -Force
+
+    if (-not $SkipSigning) {
+        & (Join-Path $PSScriptRoot "sign-release-artifacts.ps1") `
+            -PortableExecutablePaths @($OutputPath) `
+            -Thumbprint $SigningThumbprint `
+            -PfxPath $SigningPfxPath `
+            -PfxPassword $SigningPfxPassword `
+            -TimestampUrl $SigningTimestampUrl `
+            -AutoSelectCertificate:$AutoSelectSigningCertificate `
+            -SkipIfNoCertificate
+    }
+
     Write-Host "Built Ulti Guard setup executable at $OutputPath"
 }
 finally {
