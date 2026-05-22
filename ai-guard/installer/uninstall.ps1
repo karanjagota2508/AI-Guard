@@ -99,6 +99,8 @@ $registryHives = if ($isAdmin) {
 $serviceName = "AIGuardAgent"
 $machineAdminConsoleShortcut = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\Ulti Guard Agent Admin Console.lnk"
 $userAdminConsoleShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "Ulti Guard Agent Admin Console.lnk"
+$legacyMachineAdminConsoleShortcut = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Guard Agent Admin Console.lnk"
+$legacyUserAdminConsoleShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "AI Guard Agent Admin Console.lnk"
 $claudePatchScript = Join-Path $InstallerScriptRoot "scripts\patch-claude-desktop.ps1"
 if ($isAdmin) {
     if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
@@ -143,7 +145,7 @@ foreach ($registryHive in $registryHives) {
     Remove-RegistryValueIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -Name "AIGuardAgent"
 }
 
-foreach ($shortcut in @($machineAdminConsoleShortcut, $userAdminConsoleShortcut)) {
+foreach ($shortcut in @($machineAdminConsoleShortcut, $userAdminConsoleShortcut, $legacyMachineAdminConsoleShortcut, $legacyUserAdminConsoleShortcut)) {
     if ($shortcut -and (Test-Path $shortcut)) {
         Remove-Item -Path $shortcut -Force -ErrorAction SilentlyContinue
     }

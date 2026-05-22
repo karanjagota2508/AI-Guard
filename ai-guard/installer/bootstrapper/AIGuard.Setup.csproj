@@ -17,6 +17,7 @@
     <EmbeddedResource Include="brand-logo.png" LogicalName="UltiGuardSetup.BrandLogo.png" />
     <EmbeddedResource Include="brand-icon.ico" LogicalName="UltiGuardSetup.BrandIcon.ico" />
     <EmbeddedResource Include="..\install.ps1" LogicalName="UltiGuardSetup.Scripts.install.ps1" />
+    <EmbeddedResource Include="..\install-enterprise.ps1" LogicalName="UltiGuardSetup.Scripts.install-enterprise.ps1" />
     <EmbeddedResource Include="..\uninstall.ps1" LogicalName="UltiGuardSetup.Scripts.uninstall.ps1" />
   </ItemGroup>
 </Project>

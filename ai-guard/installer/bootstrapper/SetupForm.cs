@@ -10,7 +10,7 @@ namespace UltiGuardSetup;
 internal sealed class SetupForm : Form
 {
     private const string PayloadResourceName = "UltiGuardSetup.Payload.zip";
-    private const string InstallScriptResourceName = "UltiGuardSetup.Scripts.install.ps1";
+    private const string InstallScriptResourceName = "UltiGuardSetup.Scripts.install-enterprise.ps1";
     private const string UninstallScriptResourceName = "UltiGuardSetup.Scripts.uninstall.ps1";
     private const string BrandLogoResourceName = "UltiGuardSetup.BrandLogo.png";
     private const string BrandIconResourceName = "UltiGuardSetup.BrandIcon.ico";
@@ -169,15 +169,25 @@ internal sealed class SetupForm : Form
 
     private async Task RunInstallAsync()
     {
+        if (!EnsureElevated())
+        {
+            return;
+        }
+
         await RunScriptAsync(
             actionName: "installation",
             scriptResourceName: InstallScriptResourceName,
-            arguments: "-PiiPort 8000 -SkipBuild -BlockOtherExtensions -EnforceBrowserHostBlocklist -RequirePrivateBrowsingGuard -DisallowExtensionDeveloperMode -DisableBrowserDeveloperTools",
+            arguments: "-PiiPort 8000 -SkipBuild",
             successMessage: "Ulti Guard Agent installation completed.\r\n\r\nIf Chrome or Edge were open during setup, they may have been restarted so the managed extension can activate immediately.");
     }
 
     private async Task RunUninstallAsync()
     {
+        if (!EnsureElevated())
+        {
+            return;
+        }
+
         var result = MessageBox.Show(
             this,
             "This will remove the machine-wide Ulti Guard Agent installation from this PC.\r\n\r\nContinue?",
@@ -193,7 +203,7 @@ internal sealed class SetupForm : Form
         await RunScriptAsync(
             actionName: "uninstall",
             scriptResourceName: UninstallScriptResourceName,
-            arguments: "",
+            arguments: $"-InstallRoot \"{Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)}\\Ulti Guard Agent\"",
             successMessage: "Ulti Guard Agent uninstall completed.\r\n\r\nRestart Chrome and Edge to clear policy state.");
     }
 
@@ -349,6 +359,46 @@ try {{
         using var archive = new ZipArchive(payloadStream, ZipArchiveMode.Read);
         archive.ExtractToDirectory(extractionRoot, overwriteFiles: true);
         return extractionRoot;
+    }
+
+    private bool EnsureElevated()
+    {
+        if (IsAdministrator())
+        {
+            return true;
+        }
+
+        try
+        {
+            using var currentProcess = Process.GetCurrentProcess();
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = currentProcess.MainModule?.FileName ?? Application.ExecutablePath,
+                UseShellExecute = true,
+                Verb = "runas"
+            };
+
+            Process.Start(startInfo);
+            Close();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                $"Administrator approval is required to continue.\r\n\r\n{ex.Message}",
+                "Ulti Guard Agent Setup",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+
+        return false;
+    }
+
+    private static bool IsAdministrator()
+    {
+        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        var principal = new System.Security.Principal.WindowsPrincipal(identity);
+        return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
     }
 
     private void SetButtonsEnabled(bool enabled)

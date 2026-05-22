@@ -349,6 +349,12 @@ $startMenuPrograms = if ($isAdmin) {
     [Environment]::GetFolderPath("Programs")
 }
 $adminConsoleShortcut = Join-Path $startMenuPrograms "Ulti Guard Agent Admin Console.lnk"
+$legacyAdminConsoleShortcuts = @(
+    (Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Guard Agent Admin Console.lnk"),
+    (Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\Ulti Guard Agent Admin Console.lnk"),
+    (Join-Path ([Environment]::GetFolderPath("Programs")) "AI Guard Agent Admin Console.lnk"),
+    (Join-Path ([Environment]::GetFolderPath("Programs")) "Ulti Guard Agent Admin Console.lnk")
+)
 
 New-Item -ItemType Directory -Force -Path $InstallRoot, $installConfigDir, $installDistDir, $installLogsDir, $installManifestDir, $installPiiDir, $installScriptsDir, $installDesktopDir, $installBrandingDir | Out-Null
 Copy-Item -Path $daemonBinaryToInstall -Destination $installedBinary -Force
@@ -424,8 +430,8 @@ $nativeManifestJson = $nativeManifestObject | ConvertTo-Json -Depth 4
 
 Set-RegistryDefaultValue -Hive $registryHive -KeyPath "SOFTWARE\Google\Chrome\NativeMessagingHosts\com.wininfosoft.ai_guard" -Value $chromeNativeManifest
 Set-RegistryDefaultValue -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Edge\NativeMessagingHosts\com.wininfosoft.ai_guard" -Value $edgeNativeManifest
-Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Google\Chrome\Extensions\$extensionId"
-Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Edge\Extensions\$extensionId"
+Set-RegistryStringValue -Hive $registryHive -KeyPath "SOFTWARE\Google\Chrome\Extensions\$extensionId" -Name "update_url" -Value $ExtensionUpdateUrl
+Set-RegistryStringValue -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Edge\Extensions\$extensionId" -Name "update_url" -Value $ExtensionUpdateUrl
 
 if ($isAdmin) {
     Set-ManagedExtensionPolicy `
@@ -521,6 +527,12 @@ Start-Process -FilePath '$installedBinary' -ArgumentList '--config `"$installedC
     [System.IO.File]::WriteAllText($launcherScript, $launcherScriptContent, (New-Object System.Text.UTF8Encoding($false)))
     Set-RegistryStringValue -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -Name "AIGuardAgent" -Value "powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -WindowStyle Hidden -File `"$launcherScript`""
     Start-Process -FilePath $installedBinary -ArgumentList "--config `"$installedConfig`" run" -WindowStyle Hidden | Out-Null
+}
+
+foreach ($legacyShortcut in $legacyAdminConsoleShortcuts | Select-Object -Unique) {
+    if ($legacyShortcut -and (Test-Path $legacyShortcut)) {
+        Remove-Item -Path $legacyShortcut -Force -ErrorAction SilentlyContinue
+    }
 }
 
 New-ShortcutFile `
