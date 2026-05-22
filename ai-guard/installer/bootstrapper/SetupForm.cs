@@ -52,7 +52,7 @@ internal sealed class SetupForm : Form
 
         _warningLabel = new Label
         {
-            Text = "This setup will request administrator approval and then perform a machine-wide install. It bundles its own local runtime and does not require command-line steps from the end user.",
+            Text = "This setup will request administrator approval and then perform a machine-wide install. It bundles its own local runtime, does not require command-line steps from the end user, and can restart Chrome or Edge if they are open so managed extension policy activates immediately.",
             Font = new System.Drawing.Font("Segoe UI", 9),
             ForeColor = System.Drawing.Color.FromArgb(120, 84, 0),
             BackColor = System.Drawing.Color.FromArgb(255, 243, 205),
@@ -145,7 +145,7 @@ internal sealed class SetupForm : Form
             actionName: "installation",
             relativeScriptPath: InstallScriptRelativePath,
             arguments: "-PiiPort 8000 -SkipBuild",
-            successMessage: "AI Guard Agent installation completed.\r\n\r\nRestart Chrome, Edge, and Claude Desktop if they were open during setup.");
+            successMessage: "AI Guard Agent installation completed.\r\n\r\nIf Chrome or Edge were open during setup, they may have been restarted so the managed extension can activate immediately.");
     }
 
     private async Task RunUninstallAsync()

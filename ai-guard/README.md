@@ -137,6 +137,7 @@ The setup executable:
 - bundles a private Python runtime for the managed PII backend
 - can optionally bundle a local wheelhouse so the PII backend provisions fully offline
 - runs `install-enterprise.ps1 -SkipBuild` internally
+- restarts Chrome and Edge automatically if they were open so the managed extension can activate immediately
 - does not require the operator to type any PowerShell commands
 
 The installer:

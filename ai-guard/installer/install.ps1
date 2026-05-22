@@ -188,6 +188,48 @@ function Stop-PiiServiceIfPresent {
     Start-Sleep -Seconds 2
 }
 
+function Restart-BrowserIfRunning {
+    param(
+        [string]$ProcessName
+    )
+
+    $processes = @(Get-Process -Name $ProcessName -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $PID })
+    if (-not $processes -or $processes.Count -eq 0) {
+        return $false
+    }
+
+    $launchPath = $null
+    foreach ($process in $processes) {
+        if (-not $launchPath -and $process.Path -and (Test-Path $process.Path)) {
+            $launchPath = $process.Path
+        }
+
+        try {
+            if ($process.MainWindowHandle -ne 0) {
+                $null = $process.CloseMainWindow()
+            }
+        } catch { }
+    }
+
+    Start-Sleep -Seconds 3
+
+    foreach ($process in $processes) {
+        try {
+            if (-not $process.HasExited) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
+        } catch { }
+    }
+
+    Start-Sleep -Seconds 2
+
+    if ($launchPath) {
+        Start-Process -FilePath $launchPath | Out-Null
+    }
+
+    return $true
+}
+
 function Wait-ForHttpOk {
     param(
         [string]$Url,
@@ -230,6 +272,7 @@ $origin = "chrome-extension://$extensionId/"
 $bundledPythonExecutable = Join-Path $distDir "python-runtime\python.exe"
 $wheelhouseDir = Join-Path $distDir "pii-wheelhouse"
 $pythonExecutable = if (Test-Path $bundledPythonExecutable) { $bundledPythonExecutable } else { Find-PythonExecutable }
+$restartedBrowsers = @()
 
 Stop-LocalProcessByPort -Port 48555 -ExpectedProcessName "ai-guard-daemon"
 
@@ -465,6 +508,14 @@ Start-Sleep -Seconds 3
 $daemonHealth = Wait-ForHttpOk -Url "http://127.0.0.1:48555/healthz" -TimeoutSeconds 60
 $piiHealth = Wait-ForHttpOk -Url "http://127.0.0.1:$PiiPort/health" -TimeoutSeconds 240
 
+if ($isAdmin) {
+    foreach ($browserProcessName in @("chrome", "msedge")) {
+        if (Restart-BrowserIfRunning -ProcessName $browserProcessName) {
+            $restartedBrowsers += $browserProcessName
+        }
+    }
+}
+
 Write-Host ""
 Write-Host "AI Guard Agent installed."
 Write-Host "Scope        : $(if ($isAdmin) { 'machine' } else { 'current-user' })"
@@ -480,7 +531,11 @@ Write-Host "Daemon       : $($daemonHealth.Content)"
 Write-Host "PII Health   : $($piiHealth.Content)"
 Write-Host ""
 if ($isAdmin) {
-    Write-Host "Restart Chrome and Edge, then verify the extension is present and managed."
+    if ($restartedBrowsers.Count -gt 0) {
+        Write-Host "Browsers restarted: $($restartedBrowsers -join ', ')"
+    } else {
+        Write-Host "Restart Chrome and Edge, then verify the extension is present and managed."
+    }
     if ($EnforceBrowserHostBlocklist) {
         Write-Host "Blocked provider hosts are also enforced through Chrome/Edge URLBlocklist policy."
     }
