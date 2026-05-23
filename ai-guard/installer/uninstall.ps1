@@ -186,6 +186,8 @@ $registryHives = if ($isAdmin) {
 $serviceName = "AIGuardAgent"
 $machineAdminConsoleShortcut = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\Ulti Guard Agent Admin Console.lnk"
 $userAdminConsoleShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "Ulti Guard Agent Admin Console.lnk"
+$machineBrowserTestModeShortcut = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\Ulti Guard Browser Test Mode.lnk"
+$userBrowserTestModeShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "Ulti Guard Browser Test Mode.lnk"
 $legacyMachineAdminConsoleShortcut = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Guard Agent Admin Console.lnk"
 $legacyUserAdminConsoleShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "AI Guard Agent Admin Console.lnk"
 $managedChromeShortcut = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\Ulti Guard Google Chrome.lnk"
@@ -239,7 +241,14 @@ foreach ($registryHive in $registryHives) {
     }
 }
 
-foreach ($shortcut in @($machineAdminConsoleShortcut, $userAdminConsoleShortcut, $legacyMachineAdminConsoleShortcut, $legacyUserAdminConsoleShortcut)) {
+foreach ($shortcut in @(
+    $machineAdminConsoleShortcut,
+    $userAdminConsoleShortcut,
+    $machineBrowserTestModeShortcut,
+    $userBrowserTestModeShortcut,
+    $legacyMachineAdminConsoleShortcut,
+    $legacyUserAdminConsoleShortcut
+)) {
     if ($shortcut -and (Test-Path $shortcut)) {
         Remove-Item -Path $shortcut -Force -ErrorAction SilentlyContinue
     }

@@ -565,17 +565,20 @@ $patchClaudeDesktopScript = Join-Path $installScriptsDir "patch-claude-desktop.p
 $syncClaudeStoreRuntimeScript = Join-Path $installScriptsDir "sync-claude-store-runtime.ps1"
 $adminConsoleScript = Join-Path $installScriptsDir "admin-console.ps1"
 $browserPoliciesScript = Join-Path $installScriptsDir "browser-policies.ps1"
+$prepareBrowserTestModeScript = Join-Path $installScriptsDir "prepare-browser-test-mode.ps1"
 $installedClaudeHook = Join-Path $installDesktopDir "claude-desktop-hook.cjs"
 $installedClaudeUiaGuard = Join-Path $installDesktopDir "claude-desktop-uia-guard.ps1"
 $installedBrandIcon = Join-Path $installBrandingDir "logo.ico"
 $claudeLauncherScript = Join-Path $InstallRoot "launch-claude-desktop.ps1"
 $adminConsoleLauncher = Join-Path $InstallRoot "launch-admin-console.ps1"
+$browserTestModeLauncher = Join-Path $InstallRoot "launch-browser-test-mode.ps1"
 $startMenuPrograms = if ($isAdmin) {
     Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs"
 } else {
     [Environment]::GetFolderPath("Programs")
 }
 $adminConsoleShortcut = Join-Path $startMenuPrograms "Ulti Guard Agent Admin Console.lnk"
+$browserTestModeShortcut = Join-Path $startMenuPrograms "Ulti Guard Browser Test Mode.lnk"
 $legacyAdminConsoleShortcuts = @(
     (Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Guard Agent Admin Console.lnk"),
     (Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\Ulti Guard Agent Admin Console.lnk"),
@@ -590,6 +593,7 @@ Copy-Item -Path (Join-Path $InstallerScriptRoot "scripts\patch-claude-desktop.ps
 Copy-Item -Path (Join-Path $InstallerScriptRoot "scripts\sync-claude-store-runtime.ps1") -Destination $syncClaudeStoreRuntimeScript -Force
 Copy-Item -Path (Join-Path $InstallerScriptRoot "scripts\admin-console.ps1") -Destination $adminConsoleScript -Force
 Copy-Item -Path (Join-Path $InstallerScriptRoot "scripts\browser-policies.ps1") -Destination $browserPoliciesScript -Force
+Copy-Item -Path (Join-Path $InstallerScriptRoot "scripts\prepare-browser-test-mode.ps1") -Destination $prepareBrowserTestModeScript -Force
 Copy-Item -Path (Join-Path $repoRoot "desktop\claude-desktop-hook.cjs") -Destination $installedClaudeHook -Force
 Copy-Item -Path (Join-Path $repoRoot "desktop\claude-desktop-uia-guard.ps1") -Destination $installedClaudeUiaGuard -Force
 if (Test-Path $brandingSource) {
@@ -642,6 +646,12 @@ $adminConsoleLauncherContent = @"
 & '$adminConsoleScript' -ConfigPath '$installedConfig' -ServiceName '$serviceName' -LauncherScriptPath '$launcherScript' -DaemonBinaryPath '$installedBinary'
 "@
 [System.IO.File]::WriteAllText($adminConsoleLauncher, $adminConsoleLauncherContent, (New-Object System.Text.UTF8Encoding($false)))
+
+$browserTestModeLauncherContent = @"
+`$ErrorActionPreference = 'Stop'
+& '$prepareBrowserTestModeScript' -InstallRoot '$InstallRoot' -OpenFolder -OpenReadme -OpenEdge
+"@
+[System.IO.File]::WriteAllText($browserTestModeLauncher, $browserTestModeLauncherContent, (New-Object System.Text.UTF8Encoding($false)))
 
 $nativeManifestObject = @{
     name = "com.wininfosoft.ai_guard"
@@ -774,6 +784,14 @@ New-ShortcutFile `
     -Arguments "-NoProfile -ExecutionPolicy RemoteSigned -File `"$adminConsoleLauncher`"" `
     -WorkingDirectory $InstallRoot `
     -Description "Open the Ulti Guard Agent admin console." `
+    -IconLocation $installedBrandIcon
+
+New-ShortcutFile `
+    -ShortcutPath $browserTestModeShortcut `
+    -TargetPath "powershell.exe" `
+    -Arguments "-NoProfile -ExecutionPolicy RemoteSigned -File `"$browserTestModeLauncher`"" `
+    -WorkingDirectory $InstallRoot `
+    -Description "Prepare the Ulti Guard browser test package and open the unpacked extension folder." `
     -IconLocation $installedBrandIcon
 
 Start-Sleep -Seconds 3
