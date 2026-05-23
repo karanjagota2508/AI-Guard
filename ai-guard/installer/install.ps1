@@ -116,6 +116,202 @@ function New-ShortcutFile {
     $shortcut.Save()
 }
 
+function Get-ShortcutObject {
+    param(
+        [string]$ShortcutPath
+    )
+
+    if (-not (Test-Path $ShortcutPath)) {
+        return $null
+    }
+
+    $shell = New-Object -ComObject WScript.Shell
+    return $shell.CreateShortcut($ShortcutPath)
+}
+
+function Get-ChromeShortcutCandidatePaths {
+    $searchRoots = @(
+        (Join-Path $env:PUBLIC "Desktop"),
+        [Environment]::GetFolderPath("Desktop"),
+        (Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs"),
+        [Environment]::GetFolderPath("Programs"),
+        (Join-Path $env:APPDATA "Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar")
+    )
+
+    $paths = @()
+    foreach ($root in $searchRoots | Select-Object -Unique) {
+        if (-not $root -or -not (Test-Path $root)) {
+            continue
+        }
+
+        try {
+            $paths += @(Get-ChildItem -Path $root -Filter *.lnk -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+        } catch { }
+    }
+
+    return @($paths | Select-Object -Unique)
+}
+
+function Find-ChromeExecutable {
+    $candidates = @(
+        (Join-Path ${env:ProgramFiles(x86)} "Google\Chrome\Application\chrome.exe"),
+        (Join-Path $env:ProgramFiles "Google\Chrome\Application\chrome.exe")
+    )
+
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path $candidate)) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+function Test-AzureAdJoined {
+    $dsreg = Get-Command dsregcmd.exe -ErrorAction SilentlyContinue
+    if (-not $dsreg) {
+        return $false
+    }
+
+    try {
+        $output = & $dsreg.Source /status 2>$null
+        if ($LASTEXITCODE -ne 0 -or -not $output) {
+            return $false
+        }
+
+        return [bool]($output | Select-String -Pattern 'AzureAdJoined\s*:\s*YES' -Quiet)
+    } catch {
+        return $false
+    }
+}
+
+function Test-ChromeEnterpriseEnrollmentConfigured {
+    $token = Get-RegistryStringValue `
+        -Hive ([Microsoft.Win32.RegistryHive]::LocalMachine) `
+        -KeyPath "SOFTWARE\Policies\Google\Chrome" `
+        -Name "CloudManagementEnrollmentToken"
+
+    return -not [string]::IsNullOrWhiteSpace([string]$token)
+}
+
+function Test-ChromeSelfHostedManagedSupported {
+    $computerSystem = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue
+    $domainJoined = [bool]($computerSystem -and $computerSystem.PartOfDomain)
+    return $domainJoined -or (Test-AzureAdJoined) -or (Test-ChromeEnterpriseEnrollmentConfigured)
+}
+
+function Set-ChromeShortcutLoadExtensionArgument {
+    param(
+        [string]$ShortcutPath,
+        [string]$ChromeExecutablePath,
+        [string]$ExtensionDirectory
+    )
+
+    $shortcut = Get-ShortcutObject -ShortcutPath $ShortcutPath
+    if (-not $shortcut) {
+        return $false
+    }
+
+    $currentTarget = [string]$shortcut.TargetPath
+    if (-not $currentTarget) {
+        return $false
+    }
+
+    $targetLeaf = [System.IO.Path]::GetFileName($currentTarget)
+    if ($targetLeaf -notin @("chrome.exe", "chrome_proxy.exe")) {
+        return $false
+    }
+
+    $existingArguments = [string]$shortcut.Arguments
+    if ($existingArguments -match '--app-id=' -or $existingArguments -match '--app=') {
+        return $false
+    }
+
+    $desiredArgument = "--load-extension=""$ExtensionDirectory"""
+    $cleanArguments = ($existingArguments -replace '--load-extension=(?:"[^"]*"|\S+)', '').Trim()
+    $finalArguments = if ($cleanArguments) { "$cleanArguments $desiredArgument" } else { $desiredArgument }
+
+    $shortcut.TargetPath = $ChromeExecutablePath
+    $shortcut.Arguments = $finalArguments.Trim()
+    if (-not $shortcut.WorkingDirectory -or -not (Test-Path $shortcut.WorkingDirectory)) {
+        $shortcut.WorkingDirectory = Split-Path $ChromeExecutablePath -Parent
+    }
+    $shortcut.Save()
+    return $true
+}
+
+function Set-ChromeShortcutFallback {
+    param(
+        [string]$ChromeExecutablePath,
+        [string]$ExtensionDirectory,
+        [string]$StartMenuProgramsPath
+    )
+
+    if (-not $ChromeExecutablePath -or -not (Test-Path $ChromeExecutablePath)) {
+        return @()
+    }
+
+    $patched = @()
+    foreach ($shortcutPath in Get-ChromeShortcutCandidatePaths) {
+        if (Set-ChromeShortcutLoadExtensionArgument -ShortcutPath $shortcutPath -ChromeExecutablePath $ChromeExecutablePath -ExtensionDirectory $ExtensionDirectory) {
+            $patched += $shortcutPath
+        }
+    }
+
+    $managedShortcut = Join-Path $StartMenuProgramsPath "Ulti Guard Google Chrome.lnk"
+    New-ShortcutFile `
+        -ShortcutPath $managedShortcut `
+        -TargetPath $ChromeExecutablePath `
+        -Arguments "--load-extension=""$ExtensionDirectory""" `
+        -WorkingDirectory (Split-Path $ChromeExecutablePath -Parent) `
+        -Description "Launch Google Chrome with Ulti Guard protection."
+
+    if ($patched -notcontains $managedShortcut) {
+        $patched += $managedShortcut
+    }
+
+    return @($patched | Select-Object -Unique)
+}
+
+function Clear-ChromeUnsupportedManagedPolicyResidue {
+    param(
+        [Microsoft.Win32.RegistryHive]$Hive,
+        [string]$ExtensionId,
+        [string]$BlockedInstallMessage = "Only company-approved browser extensions are allowed."
+    )
+
+    Remove-ManagedExtensionPolicy -Hive $Hive -Browser "Chrome" -ExtensionId $ExtensionId
+
+    $settings = Get-ExtensionSettingsValue -Hive $Hive -Browser "Chrome"
+    if ($settings.ContainsKey("*")) {
+        $wildcardSetting = $settings["*"]
+        $wildcardInstallMode = [string]$wildcardSetting["installation_mode"]
+        $wildcardBlockedMessage = [string]$wildcardSetting["blocked_install_message"]
+
+        if ($wildcardInstallMode -eq "blocked" -and $wildcardBlockedMessage -eq $BlockedInstallMessage) {
+            $settings.Remove("*")
+            Save-ExtensionSettingsValue -Hive $Hive -Browser "Chrome" -Settings $settings
+        }
+    }
+
+    $policyRoot = Get-BrowserPolicyRoot -Browser "Chrome"
+    if ((Get-RegistryDwordValue -Hive $Hive -KeyPath $policyRoot -Name "ExtensionDeveloperModeSettings") -eq 1) {
+        Remove-RegistryValueIfPresent -Hive $Hive -KeyPath $policyRoot -Name "ExtensionDeveloperModeSettings"
+    }
+    if ((Get-RegistryDwordValue -Hive $Hive -KeyPath $policyRoot -Name "DeveloperToolsAvailability") -eq 2) {
+        Remove-RegistryValueIfPresent -Hive $Hive -KeyPath $policyRoot -Name "DeveloperToolsAvailability"
+    }
+
+    foreach ($keyPath in @(
+        (Join-Path $policyRoot "ExtensionInstallForcelist"),
+        (Get-MandatoryPrivateBrowsingPolicyPath -Browser "Chrome")
+    )) {
+        if ((Get-RegistryStringListValues -Hive $Hive -KeyPath $keyPath).Count -eq 0) {
+            Remove-RegistryKeyIfPresent -Hive $Hive -KeyPath $keyPath
+        }
+    }
+}
+
 . (Join-Path $InstallerScriptRoot "scripts\browser-policies.ps1")
 
 function Find-PythonExecutable {
@@ -204,7 +400,8 @@ function Stop-PiiServiceIfPresent {
 
 function Restart-BrowserIfRunning {
     param(
-        [string]$ProcessName
+        [string]$ProcessName,
+        [switch]$SkipRelaunch
     )
 
     $processes = @(Get-Process -Name $ProcessName -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $PID })
@@ -237,7 +434,7 @@ function Restart-BrowserIfRunning {
 
     Start-Sleep -Seconds 2
 
-    if ($launchPath) {
+    if ($launchPath -and -not $SkipRelaunch) {
         Start-Process -FilePath $launchPath | Out-Null
     }
 
@@ -292,6 +489,9 @@ $bundledPythonExecutable = Join-Path $distDir "python-runtime\python.exe"
 $wheelhouseDir = Join-Path $distDir "pii-wheelhouse"
 $pythonExecutable = if (Test-Path $bundledPythonExecutable) { $bundledPythonExecutable } else { Find-PythonExecutable }
 $restartedBrowsers = @()
+$chromeExecutablePath = Find-ChromeExecutable
+$chromeManagedSelfHostedSupported = if ($isAdmin) { Test-ChromeSelfHostedManagedSupported } else { $false }
+$chromeShortcutFallbackMode = $isAdmin -and -not $chromeManagedSelfHostedSupported -and $chromeExecutablePath
 
 Stop-LocalProcessByPort -Port 48555 -ExpectedProcessName "ai-guard-daemon"
 
@@ -434,17 +634,23 @@ Set-RegistryStringValue -Hive $registryHive -KeyPath "SOFTWARE\Google\Chrome\Ext
 Set-RegistryStringValue -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Edge\Extensions\$extensionId" -Name "update_url" -Value $ExtensionUpdateUrl
 
 if ($isAdmin) {
-    Set-ManagedExtensionPolicy `
-        -Hive $registryHive `
-        -Browser "Chrome" `
-        -ExtensionId $extensionId `
-        -UpdateUrl $ExtensionUpdateUrl `
-        -MinimumVersionRequired $MinimumExtensionVersion `
-        -BlockOtherExtensions:$BlockOtherExtensions `
-        -AllowedExtensionIds $AllowedExtensionIds `
-        -RequirePrivateBrowsingGuard:$RequirePrivateBrowsingGuard `
-        -DisallowExtensionDeveloperMode:$DisallowExtensionDeveloperMode `
-        -DisableDeveloperTools:$DisableBrowserDeveloperTools
+    if ($chromeManagedSelfHostedSupported) {
+        Set-ManagedExtensionPolicy `
+            -Hive $registryHive `
+            -Browser "Chrome" `
+            -ExtensionId $extensionId `
+            -UpdateUrl $ExtensionUpdateUrl `
+            -MinimumVersionRequired $MinimumExtensionVersion `
+            -BlockOtherExtensions:$BlockOtherExtensions `
+            -AllowedExtensionIds $AllowedExtensionIds `
+            -RequirePrivateBrowsingGuard:$RequirePrivateBrowsingGuard `
+            -DisallowExtensionDeveloperMode:$DisallowExtensionDeveloperMode `
+            -DisableDeveloperTools:$DisableBrowserDeveloperTools
+    } else {
+        Clear-ChromeUnsupportedManagedPolicyResidue `
+            -Hive $registryHive `
+            -ExtensionId $extensionId
+    }
 
     if ($EnforceBrowserHostBlocklist) {
         Set-AIGuardBrowserHostBlocklistPolicy `
@@ -549,9 +755,23 @@ $daemonHealth = Wait-ForHttpOk -Url "http://127.0.0.1:48555/healthz" -TimeoutSec
 $piiHealth = Wait-ForHttpOk -Url "http://127.0.0.1:$PiiPort/health" -TimeoutSeconds 240
 
 if ($isAdmin) {
-    foreach ($browserProcessName in @("chrome", "msedge")) {
-        if (Restart-BrowserIfRunning -ProcessName $browserProcessName) {
-            $restartedBrowsers += $browserProcessName
+    $chromeWasRunning = Restart-BrowserIfRunning -ProcessName "chrome" -SkipRelaunch:$chromeShortcutFallbackMode
+    if ($chromeWasRunning) {
+        $restartedBrowsers += "chrome"
+    }
+
+    if (Restart-BrowserIfRunning -ProcessName "msedge") {
+        $restartedBrowsers += "msedge"
+    }
+
+    if ($chromeShortcutFallbackMode) {
+        $patchedChromeShortcuts = Set-ChromeShortcutFallback `
+            -ChromeExecutablePath $chromeExecutablePath `
+            -ExtensionDirectory $installedExtensionDir `
+            -StartMenuProgramsPath $startMenuPrograms
+
+        if ($patchedChromeShortcuts.Count -gt 0 -and $chromeWasRunning) {
+            Start-Process -FilePath $chromeExecutablePath -ArgumentList "--load-extension=""$installedExtensionDir""" | Out-Null
         }
     }
 }
@@ -574,7 +794,16 @@ if ($isAdmin) {
     if ($restartedBrowsers.Count -gt 0) {
         Write-Host "Browsers restarted: $($restartedBrowsers -join ', ')"
     } else {
-        Write-Host "Restart Chrome and Edge, then verify the extension is present and managed."
+        if ($chromeShortcutFallbackMode) {
+            Write-Host "Restart Chrome and Edge, then verify the Ulti Guard extension is present and active."
+        } else {
+            Write-Host "Restart Chrome and Edge, then verify the extension is present and managed."
+        }
+    }
+    if ($chromeShortcutFallbackMode) {
+        Write-Host "Chrome self-hosted force-install is not supported on this unmanaged Windows instance."
+        Write-Host "Ulti Guard patched local Chrome shortcuts to launch Chrome with the bundled extension loaded from:"
+        Write-Host "  $installedExtensionDir"
     }
     if ($EnforceBrowserHostBlocklist) {
         Write-Host "Blocked provider hosts are also enforced through Chrome/Edge URLBlocklist policy."

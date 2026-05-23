@@ -72,6 +72,80 @@ function Stop-ProcessesByCommandLinePattern {
     }
 }
 
+function Get-ShortcutObject {
+    param(
+        [string]$ShortcutPath
+    )
+
+    if (-not (Test-Path $ShortcutPath)) {
+        return $null
+    }
+
+    $shell = New-Object -ComObject WScript.Shell
+    return $shell.CreateShortcut($ShortcutPath)
+}
+
+function Get-ChromeShortcutCandidatePaths {
+    $searchRoots = @(
+        (Join-Path $env:PUBLIC "Desktop"),
+        [Environment]::GetFolderPath("Desktop"),
+        (Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs"),
+        [Environment]::GetFolderPath("Programs"),
+        (Join-Path $env:APPDATA "Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar")
+    )
+
+    $paths = @()
+    foreach ($root in $searchRoots | Select-Object -Unique) {
+        if (-not $root -or -not (Test-Path $root)) {
+            continue
+        }
+
+        try {
+            $paths += @(Get-ChildItem -Path $root -Filter *.lnk -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+        } catch { }
+    }
+
+    return @($paths | Select-Object -Unique)
+}
+
+function Remove-ChromeShortcutLoadExtensionArgument {
+    param(
+        [string]$ShortcutPath,
+        [string]$ExtensionDirectory
+    )
+
+    $shortcut = Get-ShortcutObject -ShortcutPath $ShortcutPath
+    if (-not $shortcut) {
+        return $false
+    }
+
+    $targetLeaf = [System.IO.Path]::GetFileName([string]$shortcut.TargetPath)
+    if ($targetLeaf -notin @("chrome.exe", "chrome_proxy.exe")) {
+        return $false
+    }
+
+    $existingArguments = [string]$shortcut.Arguments
+    if (-not $existingArguments) {
+        return $false
+    }
+
+    $escapedExtensionDirectory = [Regex]::Escape($ExtensionDirectory)
+    $updatedArguments = $existingArguments -replace "--load-extension=""$escapedExtensionDirectory""", ""
+    $updatedArguments = $updatedArguments -replace '--load-extension=(?:"[^"]*"|\S+)', {
+        param($match)
+        if ($match.Value -match [Regex]::Escape($ExtensionDirectory)) { "" } else { $match.Value }
+    }
+    $updatedArguments = ($updatedArguments -replace '\s{2,}', ' ').Trim()
+
+    if ($updatedArguments -eq $existingArguments) {
+        return $false
+    }
+
+    $shortcut.Arguments = $updatedArguments
+    $shortcut.Save()
+    return $true
+}
+
 . (Join-Path $InstallerScriptRoot "scripts\browser-policies.ps1")
 
 $isAdmin = Test-IsAdministrator
@@ -101,6 +175,7 @@ $machineAdminConsoleShortcut = Join-Path $env:ProgramData "Microsoft\Windows\Sta
 $userAdminConsoleShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "Ulti Guard Agent Admin Console.lnk"
 $legacyMachineAdminConsoleShortcut = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Guard Agent Admin Console.lnk"
 $legacyUserAdminConsoleShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "AI Guard Agent Admin Console.lnk"
+$managedChromeShortcut = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\Ulti Guard Google Chrome.lnk"
 $claudePatchScript = Join-Path $InstallerScriptRoot "scripts\patch-claude-desktop.ps1"
 if ($isAdmin) {
     if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
@@ -149,6 +224,14 @@ foreach ($shortcut in @($machineAdminConsoleShortcut, $userAdminConsoleShortcut,
     if ($shortcut -and (Test-Path $shortcut)) {
         Remove-Item -Path $shortcut -Force -ErrorAction SilentlyContinue
     }
+}
+
+$installedExtensionDirectory = Join-Path $InstallRoot "extension"
+foreach ($shortcutPath in Get-ChromeShortcutCandidatePaths) {
+    Remove-ChromeShortcutLoadExtensionArgument -ShortcutPath $shortcutPath -ExtensionDirectory $installedExtensionDirectory | Out-Null
+}
+if (Test-Path $managedChromeShortcut) {
+    Remove-Item -Path $managedChromeShortcut -Force -ErrorAction SilentlyContinue
 }
 
 if (-not $KeepFiles -and (Test-Path $InstallRoot)) {
