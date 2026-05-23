@@ -33,8 +33,12 @@ function Remove-RegistryKeyIfPresent {
     )
 
     $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey($Hive, [Microsoft.Win32.RegistryView]::Registry64)
-    $baseKey.DeleteSubKeyTree($KeyPath, $false)
-    $baseKey.Dispose()
+    try {
+        $baseKey.DeleteSubKeyTree($KeyPath, $false)
+    } catch [System.UnauthorizedAccessException] {
+    } finally {
+        $baseKey.Dispose()
+    }
 }
 
 function Remove-RegistryValueIfPresent {
@@ -45,12 +49,19 @@ function Remove-RegistryValueIfPresent {
     )
 
     $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey($Hive, [Microsoft.Win32.RegistryView]::Registry64)
-    $key = $baseKey.OpenSubKey($KeyPath, $true)
-    if ($key) {
-        $key.DeleteValue($Name, $false)
-        $key.Dispose()
+    try {
+        $key = $baseKey.OpenSubKey($KeyPath, $true)
+        if ($key) {
+            try {
+                $key.DeleteValue($Name, $false)
+            } catch [System.UnauthorizedAccessException] {
+            } finally {
+                $key.Dispose()
+            }
+        }
+    } finally {
+        $baseKey.Dispose()
     }
-    $baseKey.Dispose()
 }
 
 function Stop-ProcessesByCommandLinePattern {
@@ -213,13 +224,19 @@ if ($piiListener) {
 }
 
 foreach ($registryHive in $registryHives) {
-    Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Google\Chrome\NativeMessagingHosts\com.wininfosoft.ai_guard"
-    Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Edge\NativeMessagingHosts\com.wininfosoft.ai_guard"
-    Remove-ManagedExtensionPolicy -Hive $registryHive -Browser "Chrome" -ExtensionId "kgfkgellcbbmadimiahbfndmfbhfobko"
-    Remove-ManagedExtensionPolicy -Hive $registryHive -Browser "Edge" -ExtensionId "kgfkgellcbbmadimiahbfndmfbhfobko"
-    Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Google\Chrome\Extensions\kgfkgellcbbmadimiahbfndmfbhfobko"
-    Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Edge\Extensions\kgfkgellcbbmadimiahbfndmfbhfobko"
-    Remove-RegistryValueIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -Name "AIGuardAgent"
+    try {
+        Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Google\Chrome\NativeMessagingHosts\com.wininfosoft.ai_guard"
+        Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Edge\NativeMessagingHosts\com.wininfosoft.ai_guard"
+        Remove-ManagedExtensionPolicy -Hive $registryHive -Browser "Chrome" -ExtensionId "kgfkgellcbbmadimiahbfndmfbhfobko"
+        Remove-ManagedExtensionPolicy -Hive $registryHive -Browser "Edge" -ExtensionId "kgfkgellcbbmadimiahbfndmfbhfobko"
+        Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Google\Chrome\Extensions\kgfkgellcbbmadimiahbfndmfbhfobko"
+        Remove-RegistryKeyIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Edge\Extensions\kgfkgellcbbmadimiahbfndmfbhfobko"
+        Remove-RegistryValueIfPresent -Hive $registryHive -KeyPath "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -Name "AIGuardAgent"
+    } catch [System.UnauthorizedAccessException] {
+        Write-Warning "Skipping some registry cleanup under $registryHive because access was denied."
+    } catch {
+        Write-Warning "Skipping some registry cleanup under $registryHive because: $($_.Exception.Message)"
+    }
 }
 
 foreach ($shortcut in @($machineAdminConsoleShortcut, $userAdminConsoleShortcut, $legacyMachineAdminConsoleShortcut, $legacyUserAdminConsoleShortcut)) {
@@ -245,7 +262,11 @@ if (-not $KeepFiles) {
 
     foreach ($root in @($rootsToRemove | Where-Object { $_ } | Select-Object -Unique)) {
         if (Test-Path $root) {
-            Remove-Item -Path $root -Recurse -Force
+            try {
+                Remove-Item -Path $root -Recurse -Force
+            } catch {
+                Write-Warning ("Could not fully remove {0}: {1}" -f $root, $_.Exception.Message)
+            }
         }
     }
 }
