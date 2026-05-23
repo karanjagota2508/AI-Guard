@@ -15,7 +15,9 @@ $InstallerScriptRoot = if ($PSScriptRoot) {
     (Get-Location).Path
 }
 
+$machineInstallRoot = "$env:ProgramFiles\Ulti Guard Agent"
 $legacyMachineInstallRoot = "$env:ProgramFiles\AI Guard Agent"
+$userInstallRoot = Join-Path $env:LOCALAPPDATA "Ulti Guard Agent"
 $legacyUserInstallRoot = Join-Path $env:LOCALAPPDATA "AI Guard Agent"
 
 function Test-IsAdministrator {
@@ -150,7 +152,7 @@ function Remove-ChromeShortcutLoadExtensionArgument {
 
 $isAdmin = Test-IsAdministrator
 if (-not $isAdmin -and $InstallRoot.StartsWith($env:ProgramFiles, [System.StringComparison]::OrdinalIgnoreCase)) {
-    $InstallRoot = Join-Path $env:LOCALAPPDATA "Ulti Guard Agent"
+    $InstallRoot = $userInstallRoot
 }
 
 if (-not (Test-Path $InstallRoot)) {
@@ -234,8 +236,18 @@ if (Test-Path $managedChromeShortcut) {
     Remove-Item -Path $managedChromeShortcut -Force -ErrorAction SilentlyContinue
 }
 
-if (-not $KeepFiles -and (Test-Path $InstallRoot)) {
-    Remove-Item -Path $InstallRoot -Recurse -Force
+if (-not $KeepFiles) {
+    $rootsToRemove = if ($isAdmin) {
+        @($InstallRoot, $machineInstallRoot, $legacyMachineInstallRoot, $userInstallRoot, $legacyUserInstallRoot)
+    } else {
+        @($InstallRoot, $userInstallRoot, $legacyUserInstallRoot)
+    }
+
+    foreach ($root in @($rootsToRemove | Where-Object { $_ } | Select-Object -Unique)) {
+        if (Test-Path $root) {
+            Remove-Item -Path $root -Recurse -Force
+        }
+    }
 }
 
 Write-Host "Ulti Guard Agent removed. Restart Chrome and Edge to clear extension policy state."

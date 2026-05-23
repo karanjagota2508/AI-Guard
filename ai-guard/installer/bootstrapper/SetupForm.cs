@@ -156,15 +156,42 @@ internal sealed class SetupForm : Form
         base.OnFormClosing(e);
     }
 
-    private static bool IsInstalled()
+    private static IEnumerable<string> GetCandidateInstallRoots()
     {
         var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
-        return Directory.Exists(Path.Combine(programFiles, "Ulti Guard Agent"))
-            || Directory.Exists(Path.Combine(programFiles, "AI Guard Agent"))
-            || Directory.Exists(Path.Combine(localAppData, "Ulti Guard Agent"))
-            || Directory.Exists(Path.Combine(localAppData, "AI Guard Agent"));
+        return new[]
+        {
+            Path.Combine(programFiles, "Ulti Guard Agent"),
+            Path.Combine(programFiles, "AI Guard Agent"),
+            Path.Combine(localAppData, "Ulti Guard Agent"),
+            Path.Combine(localAppData, "AI Guard Agent")
+        };
+    }
+
+    private static bool IsInstallRootPresent(string installRoot)
+    {
+        if (string.IsNullOrWhiteSpace(installRoot) || !Directory.Exists(installRoot))
+        {
+            return false;
+        }
+
+        var markerPaths = new[]
+        {
+            "ai-guard-daemon.exe",
+            "launch-admin-console.ps1",
+            Path.Combine("config", "ai-guard.json"),
+            Path.Combine("dist", "ai-guard-extension.crx"),
+            Path.Combine("extension", "manifest.json")
+        };
+
+        return markerPaths.Any(relativePath => File.Exists(Path.Combine(installRoot, relativePath)));
+    }
+
+    private static bool IsInstalled()
+    {
+        return GetCandidateInstallRoots().Any(IsInstallRootPresent);
     }
 
     private async Task RunInstallAsync()
