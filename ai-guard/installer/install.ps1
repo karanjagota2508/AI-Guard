@@ -167,6 +167,30 @@ function Find-ChromeExecutable {
     return $null
 }
 
+function Get-ChromeMajorVersion {
+    param(
+        [string]$ChromeExecutablePath
+    )
+
+    if (-not $ChromeExecutablePath -or -not (Test-Path $ChromeExecutablePath)) {
+        return $null
+    }
+
+    try {
+        $productVersion = (Get-Item $ChromeExecutablePath).VersionInfo.ProductVersion
+        if (-not $productVersion) {
+            return $null
+        }
+
+        $majorVersion = 0
+        if ([int]::TryParse(($productVersion -split '\.')[0], [ref]$majorVersion)) {
+            return $majorVersion
+        }
+    } catch { }
+
+    return $null
+}
+
 function Test-AzureAdJoined {
     $dsreg = Get-Command dsregcmd.exe -ErrorAction SilentlyContinue
     if (-not $dsreg) {
@@ -490,8 +514,11 @@ $wheelhouseDir = Join-Path $distDir "pii-wheelhouse"
 $pythonExecutable = if (Test-Path $bundledPythonExecutable) { $bundledPythonExecutable } else { Find-PythonExecutable }
 $restartedBrowsers = @()
 $chromeExecutablePath = Find-ChromeExecutable
+$chromeMajorVersion = Get-ChromeMajorVersion -ChromeExecutablePath $chromeExecutablePath
 $chromeManagedSelfHostedSupported = if ($isAdmin) { Test-ChromeSelfHostedManagedSupported } else { $false }
-$chromeShortcutFallbackMode = $isAdmin -and -not $chromeManagedSelfHostedSupported -and $chromeExecutablePath
+$chromeCommandLineExtensionSupport = $chromeExecutablePath -and ($null -eq $chromeMajorVersion -or $chromeMajorVersion -lt 137)
+$chromeShortcutFallbackMode = $isAdmin -and -not $chromeManagedSelfHostedSupported -and $chromeCommandLineExtensionSupport
+$chromeModernUnmanagedUnsupported = $isAdmin -and -not $chromeManagedSelfHostedSupported -and $chromeExecutablePath -and -not $chromeCommandLineExtensionSupport
 
 Stop-LocalProcessByPort -Port 48555 -ExpectedProcessName "ai-guard-daemon"
 
@@ -794,11 +821,20 @@ if ($isAdmin) {
     if ($restartedBrowsers.Count -gt 0) {
         Write-Host "Browsers restarted: $($restartedBrowsers -join ', ')"
     } else {
-        if ($chromeShortcutFallbackMode) {
+        if ($chromeModernUnmanagedUnsupported) {
+            Write-Host "Chrome was left installed, but the Ulti Guard web extension cannot be activated there on this machine."
+        } elseif ($chromeShortcutFallbackMode) {
             Write-Host "Restart Chrome and Edge, then verify the Ulti Guard extension is present and active."
         } else {
             Write-Host "Restart Chrome and Edge, then verify the extension is present and managed."
         }
+    }
+    if ($chromeModernUnmanagedUnsupported) {
+        Write-Host "Chrome $chromeMajorVersion on unmanaged Windows no longer supports loading this self-hosted extension."
+        Write-Host "Ulti Guard web protection on Chrome requires one of the following:"
+        Write-Host "  1. Chrome managed through domain/Azure AD/Chrome Enterprise with a valid enrollment token"
+        Write-Host "  2. The extension published through the Chrome Web Store and deployed from there"
+        Write-Host "Use Microsoft Edge or Claude Desktop on this machine if you need immediate PII protection without additional Chrome enterprise setup."
     }
     if ($chromeShortcutFallbackMode) {
         Write-Host "Chrome self-hosted force-install is not supported on this unmanaged Windows instance."
