@@ -37,11 +37,12 @@ enum Command {
 async fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if let Some(origin) = args
-        .get(1)
-        .filter(|value| value.starts_with("chrome-extension://"))
+        .iter()
+        .skip(1)
+        .find(|value| value.starts_with("chrome-extension://"))
     {
         let config = AppConfig::load(&default_config_path())?;
-        return native_host::run(Some(origin), config).await;
+        return native_host::run(Some(origin.as_str()), config).await;
     }
 
     let cli = Cli::parse();

@@ -32,7 +32,8 @@
   ],
   "claude": {
     "web_hosts": [
-      "claude.ai"
+      "claude.ai",
+      "claude.com"
     ],
     "desktop_processes": [
       "claude"
@@ -62,7 +63,7 @@
   },
   "package": {
     "extension_id": "kgfkgellcbbmadimiahbfndmfbhfobko",
-    "extension_version": "1.0.1",
+    "extension_version": "1.0.4",
     "extension_crx_path": "../installer/dist/ai-guard-extension.crx"
   },
   "logging": {

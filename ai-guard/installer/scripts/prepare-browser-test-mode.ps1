@@ -9,6 +9,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 
 function Find-BrowserExecutable {
     param(
@@ -108,12 +109,15 @@ Chrome / Edge steps:
 3. Click Load unpacked.
 4. Select this folder:
    $testExtensionDir
-5. Open claude.ai or claude.com and test prompt redaction / blocking.
+5. Open http://127.0.0.1:48555/__ulti_guard_test__/mock-claude and test prompt redaction / blocking.
+6. Open a blocked provider such as https://chatgpt.com while the mock Claude page remains open.
 
 Notes:
 - This test mode is not the locked production deployment.
 - Users can remove or disable this unpacked extension.
 - Production enterprise install remains unchanged.
+- For a fully automated local smoke test on a developer machine, run:
+  powershell -NoProfile -ExecutionPolicy RemoteSigned -File "$repoRoot\installer\scripts\run-local-browser-smoke-test.ps1"
 "@
 [System.IO.File]::WriteAllText($readmePath, $readme, $encoding)
 

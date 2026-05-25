@@ -4,7 +4,7 @@ param(
     [string]$AuthToken,
     [string]$ExtensionCrxPath,
     [string]$ExtensionId = "kgfkgellcbbmadimiahbfndmfbhfobko",
-    [string]$ExtensionVersion = "1.0.2",
+    [string]$ExtensionVersion = "1.0.4",
     [string]$LogDirectory,
     [string]$PiiExecutablePath,
     [string]$PiiWorkingDirectory,

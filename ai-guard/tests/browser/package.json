@@ -1,0 +1,8 @@
+{
+  "name": "ulti-guard-browser-tests",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "puppeteer-core": "^24.31.0"
+  }
+}

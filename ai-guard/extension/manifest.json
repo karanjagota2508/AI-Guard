@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Ulti Guard Agent",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Protect Claude sessions with prompt scanning and LLM isolation.",
   "icons": {
     "16": "assets/icon16.png",
@@ -37,7 +37,9 @@
     {
       "matches": [
         "https://claude.ai/*",
-        "https://claude.com/*"
+        "https://claude.com/*",
+        "http://127.0.0.1:48555/__ulti_guard_test__/*",
+        "http://localhost:48555/__ulti_guard_test__/*"
       ],
       "js": [
         "content-script.js"

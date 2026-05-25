@@ -1,5 +1,9 @@
 const NATIVE_HOST = "com.wininfosoft.ai_guard";
 const CLAUDE_HOSTS = ["claude.ai", "claude.com"];
+const TEST_PAGE_PREFIXES = [
+  "http://127.0.0.1:48555/__ulti_guard_test__/",
+  "http://localhost:48555/__ulti_guard_test__/",
+];
 const STATUS_CACHE_TTL_MS = 2000;
 const CLAUDE_PRESENCE_CACHE_TTL_MS = 1000;
 
@@ -212,18 +216,20 @@ async function syncClaudePresence({ force = false } = {}) {
 
   claudePresencePromise = (async () => {
     const tabs = await chrome.tabs.query({});
-    const claudeTabs = tabs.filter((tab) => isClaudeUrl(tab.pendingUrl || tab.url));
-    const hasClaudeTabs = claudeTabs.length > 0;
+    const guardTabs = tabs.filter((tab) =>
+      isGuardSourceUrl(tab.pendingUrl || tab.url),
+    );
+    const hasGuardTabs = guardTabs.length > 0;
     const pageUrl =
-      claudeTabs.find((tab) => tab.active)?.pendingUrl ||
-      claudeTabs.find((tab) => tab.active)?.url ||
-      claudeTabs[0]?.pendingUrl ||
-      claudeTabs[0]?.url ||
+      guardTabs.find((tab) => tab.active)?.pendingUrl ||
+      guardTabs.find((tab) => tab.active)?.url ||
+      guardTabs[0]?.pendingUrl ||
+      guardTabs[0]?.url ||
       "https://claude.ai/";
 
     daemonState.lastClaudePresenceAt = Date.now();
 
-    if (!force && !hasClaudeTabs && daemonState.mode === "idle") {
+    if (!force && !hasGuardTabs && daemonState.mode === "idle") {
       return snapshot();
     }
 
@@ -232,7 +238,7 @@ async function syncClaudePresence({ force = false } = {}) {
         method: "POST",
         body: {
           page_url: pageUrl,
-          tab_visible: hasClaudeTabs,
+          tab_visible: hasGuardTabs,
         },
       });
       applyStatus(status);
@@ -280,7 +286,7 @@ async function evaluateTab(tabId, url) {
 
   await syncClaudePresence();
   const status = await refreshStatus(isClaudeUrl(url));
-  if (isClaudeUrl(url)) {
+  if (isGuardSourceUrl(url)) {
     return;
   }
 
@@ -325,6 +331,18 @@ function isClaudeUrl(url) {
   }
 
   return matchesHost(hostname, CLAUDE_HOSTS);
+}
+
+function isGuardSourceUrl(url) {
+  if (!url) {
+    return false;
+  }
+
+  if (isClaudeUrl(url)) {
+    return true;
+  }
+
+  return TEST_PAGE_PREFIXES.some((prefix) => url.startsWith(prefix));
 }
 
 function hostnameForUrl(url) {
