@@ -1270,7 +1270,7 @@ New-ShortcutFile `
 
 Start-Sleep -Seconds 3
 
-$daemonHealth = Wait-ForHttpOk -Url "http://127.0.0.1:48555/healthz" -TimeoutSeconds 60
+$daemonHealth = Wait-ForHttpOk -Url "http://127.0.0.1:48555/readyz" -TimeoutSeconds 180
 $piiHealth = Wait-ForHttpOk -Url "http://127.0.0.1:$PiiPort/health" -TimeoutSeconds 240
 
 if ($isAdmin) {

@@ -33,6 +33,8 @@ public partial class MainWindow : Window
     private string _configPath = string.Empty;
     private string _installRoot = string.Empty;
     private JsonObject _configRoot = new();
+    private readonly CancellationTokenSource _windowLifetime = new();
+    private int _backgroundApplyInProgress;
 
     public MainWindow()
     {
@@ -42,6 +44,7 @@ public partial class MainWindow : Window
         PresetComboBox.ItemsSource = _providerCatalog.Keys.ToArray();
         PresetComboBox.SelectedIndex = 0;
         Loaded += MainWindow_Loaded;
+        Closed += (_, _) => _windowLifetime.Cancel();
     }
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
@@ -257,6 +260,18 @@ public partial class MainWindow : Window
 
     private async void SaveButton_Click(object sender, RoutedEventArgs e)
     {
+        if (IsBackgroundApplyInProgress())
+        {
+            StatusTextBlock.Text = "Apply already in progress.";
+            MessageBox.Show(
+                "Ulti Guard is still applying the previous Save & Apply request. Wait for that restart to finish before saving again.",
+                "Ulti Guard Admin Console",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var backgroundApplyScheduled = false;
         try
         {
             SetBusy(true);
@@ -295,14 +310,30 @@ public partial class MainWindow : Window
 
             _configService.Save(_configPath, _configRoot);
             await _operations.ApplyBrowserPoliciesAsync(_installRoot, _configPath, CancellationToken.None);
-            var runtimeResult = await _operations.RestartRuntimeAsync(_installRoot, _configPath, CancellationToken.None);
-            StatusTextBlock.Text = $"Saved. {runtimeResult}";
+
+            if (Interlocked.CompareExchange(ref _backgroundApplyInProgress, 1, 0) != 0)
+            {
+                StatusTextBlock.Text = "Apply already in progress.";
+                MessageBox.Show(
+                    "Ulti Guard is still applying the previous Save & Apply request. Wait for that restart to finish before saving again.",
+                    "Ulti Guard Admin Console",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            StatusTextBlock.Text = "Saved. Restarting Ulti Guard...";
 
             MessageBox.Show(
-                $"Provider settings and PII configurations were saved successfully.{Environment.NewLine}{Environment.NewLine}{runtimeResult}",
+                "Provider settings and PII configurations were saved successfully."
+                + Environment.NewLine + Environment.NewLine
+                + "Applying runtime changes in the background.",
                 "Ulti Guard Admin Console",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
+
+            _ = ApplyRuntimeChangesInBackgroundAsync(_installRoot, _configPath, _windowLifetime.Token);
+            backgroundApplyScheduled = true;
         }
         catch (Exception ex)
         {
@@ -316,6 +347,10 @@ public partial class MainWindow : Window
         finally
         {
             SetBusy(false);
+            if (!backgroundApplyScheduled && IsBackgroundApplyInProgress())
+            {
+                Interlocked.Exchange(ref _backgroundApplyInProgress, 0);
+            }
         }
     }
 
@@ -409,6 +444,81 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task ApplyRuntimeChangesInBackgroundAsync(
+        string installRoot,
+        string configPath,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var runtimeResult = await _operations.RestartRuntimeAsync(installRoot, configPath, cancellationToken);
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (runtimeResult.Success)
+                {
+                    StatusTextBlock.Text = $"Saved. {runtimeResult.Message}";
+                    return;
+                }
+
+                StatusTextBlock.Text = "Saved, but Ulti Guard restart/readiness failed.";
+                if (!IsLoaded)
+                {
+                    return;
+                }
+
+                MessageBox.Show(
+                    this,
+                    "Settings were saved successfully, but Ulti Guard could not restart or become ready."
+                    + Environment.NewLine + Environment.NewLine
+                    + "PII protection may remain unavailable until the service is restarted successfully."
+                    + Environment.NewLine + Environment.NewLine
+                    + runtimeResult.Message,
+                    "Ulti Guard Admin Console",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            });
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                StatusTextBlock.Text = "Saved, but Ulti Guard restart/readiness failed.";
+                if (!IsLoaded)
+                {
+                    return;
+                }
+
+                MessageBox.Show(
+                    this,
+                    "Settings were saved successfully, but Ulti Guard could not restart or become ready."
+                    + Environment.NewLine + Environment.NewLine
+                    + "PII protection may remain unavailable until the service is restarted successfully."
+                    + Environment.NewLine + Environment.NewLine
+                    + ex.Message,
+                    "Ulti Guard Admin Console",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            });
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _backgroundApplyInProgress, 0);
+        }
+    }
+
     private void SetBusy(bool busy)
     {
         SaveButton.IsEnabled = !busy;
@@ -421,6 +531,9 @@ public partial class MainWindow : Window
         RemoveProcessButton.IsEnabled = !busy;
         Cursor = busy ? Cursors.Wait : null;
     }
+
+    private bool IsBackgroundApplyInProgress() =>
+        Interlocked.CompareExchange(ref _backgroundApplyInProgress, 0, 0) == 1;
 
     private string? ParseNamedArgument(string name)
     {

@@ -506,9 +506,42 @@ function Remove-SelectedListItems {
     Set-ListBoxValues -ListBox $ListBox -Values (Get-ListBoxValues -ListBox $ListBox)
 }
 
-function Wait-ForAIGuardHealth {
+function Get-AIGuardReadinessTimeoutMs {
+    $defaultTimeoutMs = 60000
+
+    if (-not $script:config) {
+        return $defaultTimeoutMs
+    }
+
+    $managedPii = $script:config["managed_pii"]
+    if (-not $managedPii) {
+        return $defaultTimeoutMs
+    }
+
+    $enabled = $true
+    if ($managedPii.Contains("enabled")) {
+        $enabled = [bool]$managedPii["enabled"]
+    }
+
+    if (-not $enabled) {
+        return $defaultTimeoutMs
+    }
+
+    $startupTimeoutMs = 0
+    if ($managedPii.Contains("startup_timeout_ms")) {
+        [void][int]::TryParse([string]$managedPii["startup_timeout_ms"], [ref]$startupTimeoutMs)
+    }
+
+    if ($startupTimeoutMs -le 0) {
+        return $defaultTimeoutMs
+    }
+
+    return [Math]::Min([Math]::Max($startupTimeoutMs + 15000, 60000), 300000)
+}
+
+function Wait-ForAIGuardReadiness {
     param(
-        [int]$TimeoutMs = 12000
+        [int]$TimeoutMs = 0
     )
 
     $listenAddress = [string]$script:config["listen_address"]
@@ -516,7 +549,11 @@ function Wait-ForAIGuardHealth {
         return $false
     }
 
-    $healthUrl = "http://$listenAddress/healthz"
+    if ($TimeoutMs -le 0) {
+        $TimeoutMs = Get-AIGuardReadinessTimeoutMs
+    }
+
+    $healthUrl = "http://$listenAddress/readyz"
     $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMs)
     while ([DateTime]::UtcNow -lt $deadline) {
         try {
@@ -535,12 +572,23 @@ function Wait-ForAIGuardHealth {
 
 function Restart-AIGuardRuntime {
     if ($ServiceName -and (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) {
-        Restart-Service -Name $ServiceName -Force -ErrorAction Stop
-        if (Wait-ForAIGuardHealth) {
+        $service = Get-Service -Name $ServiceName -ErrorAction Stop
+        if ($service.Status -ne [System.ServiceProcess.ServiceControllerStatus]::Stopped) {
+            Stop-Service -Name $ServiceName -Force -ErrorAction Stop
+            $service.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Stopped, [TimeSpan]::FromSeconds(60))
+            $service.Refresh()
+        }
+
+        if ($service.Status -ne [System.ServiceProcess.ServiceControllerStatus]::Running) {
+            Start-Service -Name $ServiceName -ErrorAction Stop
+            $service.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Running, [TimeSpan]::FromSeconds(60))
+        }
+
+        if (Wait-ForAIGuardReadiness) {
             return "Windows service restarted."
         }
 
-        return "Windows service restart requested, but daemon health check failed."
+        return "Windows service restart requested, but daemon readiness check failed."
     }
 
     Get-Process ai-guard-daemon -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -548,20 +596,20 @@ function Restart-AIGuardRuntime {
 
     if ($LauncherScriptPath -and (Test-Path $LauncherScriptPath)) {
         Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy RemoteSigned -File `"$LauncherScriptPath`"" -WindowStyle Hidden | Out-Null
-        if (Wait-ForAIGuardHealth) {
+        if (Wait-ForAIGuardReadiness) {
             return "Daemon relaunched through launcher script."
         }
 
-        return "Launcher script executed, but daemon health check failed."
+        return "Launcher script executed, but daemon readiness check failed."
     }
 
     if ($DaemonBinaryPath -and (Test-Path $DaemonBinaryPath)) {
         Start-Process -FilePath $DaemonBinaryPath -ArgumentList "--config `"$ConfigPath`" run" -WindowStyle Hidden | Out-Null
-        if (Wait-ForAIGuardHealth) {
+        if (Wait-ForAIGuardReadiness) {
             return "Daemon relaunched directly."
         }
 
-        return "Daemon launch attempted, but health check failed."
+        return "Daemon launch attempted, but readiness check failed."
     }
 
     return "Config saved. Restart Ulti Guard manually."
