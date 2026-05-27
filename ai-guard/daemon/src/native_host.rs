@@ -1,4 +1,7 @@
 use std::io::{self, Read, Write};
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow};
 use reqwest::header::{AUTHORIZATION, ORIGIN};
@@ -6,16 +9,18 @@ use serde::Serialize;
 
 use crate::config::AppConfig;
 use crate::contracts::{
-    NativeErrorResponse, NativeHelloResponse, NativeHostRequest, NativeStatusResponse,
+    GuardMode, NativeErrorResponse, NativeHelloResponse, NativeHostRequest, NativeStatusResponse,
     StatusResponse,
 };
-use crate::runtime::AppState;
+
+const NATIVE_HOST_MESSAGE_TIMEOUT: Duration = Duration::from_secs(2);
+const NATIVE_HOST_STATUS_TIMEOUT: Duration = Duration::from_millis(750);
 
 pub async fn run(origin: Option<&str>, config: AppConfig) -> Result<()> {
     let origin = origin.ok_or_else(|| anyhow!("native host origin missing"))?;
     let extension_id = origin
         .strip_prefix("chrome-extension://")
-        .and_then(|item| item.strip_suffix('/'))
+        .map(|item| item.trim_end_matches('/'))
         .ok_or_else(|| anyhow!("unexpected native host origin {origin}"))?;
 
     if !config.is_allowed_extension_id(extension_id) {
@@ -26,31 +31,39 @@ pub async fn run(origin: Option<&str>, config: AppConfig) -> Result<()> {
         return Ok(());
     }
 
-    let request: NativeHostRequest =
-        read_message().context("failed to read native host request")?;
+    let request: NativeHostRequest = match read_message_with_timeout() {
+        Ok(request) => request,
+        Err(error) => {
+            write_message(&NativeErrorResponse {
+                kind: "error",
+                message: format!("native bootstrap request timed out: {error}"),
+            })?;
+            return Ok(());
+        }
+    };
     let live_status = fetch_live_status(&config, origin).await.ok();
-    let state = AppState::new(config.clone())?;
-    let snapshot = live_status
+    let mode = live_status
         .as_ref()
-        .map(|status| (status.mode, status.active_sources.clone()))
-        .unwrap_or_else(|| {
-            let snapshot = state.guard.snapshot();
-            (snapshot.mode, snapshot.active_sources)
-        });
+        .map(|status| status.mode)
+        .unwrap_or(GuardMode::Idle);
+    let active_sources = live_status
+        .as_ref()
+        .map(|status| status.active_sources.clone())
+        .unwrap_or_default();
 
     match request.kind.as_str() {
         "hello" => write_message(&NativeHelloResponse {
             kind: "hello",
-            token: state.config.auth_token.clone(),
-            base_url: state.config.base_url()?,
+            token: config.auth_token.clone(),
+            base_url: config.base_url()?,
             extension_id: extension_id.to_string(),
-            mode: snapshot.0,
-            blocked_hosts: state.config.blocking.browser_hosts.clone(),
+            mode,
+            blocked_hosts: config.blocking.browser_hosts.clone(),
         })?,
         "status" => write_message(&NativeStatusResponse {
             kind: "status",
-            mode: snapshot.0,
-            active_sources: snapshot.1,
+            mode,
+            active_sources,
         })?,
         "ping" => write_message(&serde_json::json!({ "type": "pong" }))?,
         _ => write_message(&NativeErrorResponse {
@@ -65,6 +78,8 @@ pub async fn run(origin: Option<&str>, config: AppConfig) -> Result<()> {
 async fn fetch_live_status(config: &AppConfig, origin: &str) -> Result<StatusResponse> {
     let client = reqwest::Client::builder()
         .use_rustls_tls()
+        .connect_timeout(NATIVE_HOST_STATUS_TIMEOUT)
+        .timeout(NATIVE_HOST_STATUS_TIMEOUT)
         .build()
         .context("failed to create native host HTTP client")?;
     let response = client
@@ -80,6 +95,20 @@ async fn fetch_live_status(config: &AppConfig, origin: &str) -> Result<StatusRes
         .json::<StatusResponse>()
         .await
         .context("failed to decode live daemon status")
+}
+
+fn read_message_with_timeout<T>() -> Result<T>
+where
+    T: serde::de::DeserializeOwned + Send + 'static,
+{
+    let (sender, receiver) = mpsc::sync_channel(1);
+    thread::spawn(move || {
+        let _ = sender.send(read_message());
+    });
+
+    receiver
+        .recv_timeout(NATIVE_HOST_MESSAGE_TIMEOUT)
+        .map_err(|_| anyhow!("timed out waiting for browser request"))?
 }
 
 fn read_message<T>() -> Result<T>

@@ -15,6 +15,14 @@ pub enum ScanAction {
     Redact,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ScanDecisionKind {
+    Clean,
+    PiiDetected,
+    ScanError,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanRequest {
     pub text: String,
@@ -23,8 +31,52 @@ pub struct ScanRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanResponse {
     pub action: ScanAction,
+    pub decision_kind: ScanDecisionKind,
     pub redacted_text: String,
     pub reason: String,
+    #[serde(default)]
+    pub detected_entity: Option<String>,
+}
+
+impl ScanResponse {
+    pub fn clean(redacted_text: String, reason: impl Into<String>) -> Self {
+        Self {
+            action: ScanAction::Allow,
+            decision_kind: ScanDecisionKind::Clean,
+            redacted_text,
+            reason: reason.into(),
+            detected_entity: None,
+        }
+    }
+
+    pub fn pii_detected(
+        action: ScanAction,
+        redacted_text: String,
+        reason: impl Into<String>,
+        detected_entity: Option<String>,
+    ) -> Self {
+        Self {
+            action,
+            decision_kind: ScanDecisionKind::PiiDetected,
+            redacted_text,
+            reason: reason.into(),
+            detected_entity,
+        }
+    }
+
+    pub fn scan_error(
+        action: ScanAction,
+        redacted_text: String,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self {
+            action,
+            decision_kind: ScanDecisionKind::ScanError,
+            redacted_text,
+            reason: reason.into(),
+            detected_entity: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +95,7 @@ pub struct StatusResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PiiEngineRequest {
     pub text: String,
+    pub score_threshold: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

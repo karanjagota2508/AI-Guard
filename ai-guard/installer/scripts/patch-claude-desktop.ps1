@@ -100,7 +100,13 @@ function Get-BridgeConfiguration {
         throw "listen_address missing in $Path"
     }
 
-    $extensionId = "$($config.package.extension_id)"
+    $extensionId = "$($config.package.edge_extension_id)"
+    if (-not $extensionId) {
+        $extensionId = "$($config.package.chrome_extension_id)"
+    }
+    if (-not $extensionId) {
+        $extensionId = "$($config.package.extension_id)"
+    }
     if (-not $extensionId) {
         $extensionId = @($config.extension_ids)[0]
     }
@@ -231,7 +237,7 @@ function Restore-ClaudeDesktopVersion {
 
 $claudeVersions = @(Get-ClaudeResourceDirectories -Root $ClaudeRoot)
 if ($claudeVersions.Count -eq 0) {
-    Write-Host "Ulti Guard Agent: Claude Desktop not found under $ClaudeRoot"
+    Write-Host "Ulti Guard: Claude Desktop not found under $ClaudeRoot"
     return
 }
 
@@ -265,5 +271,5 @@ try {
 }
 
 $results | ForEach-Object {
-    Write-Host "Ulti Guard Agent: Claude Desktop $($_.VersionName) -> $($_.Status)"
+    Write-Host "Ulti Guard: Claude Desktop $($_.VersionName) -> $($_.Status)"
 }

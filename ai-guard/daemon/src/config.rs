@@ -9,12 +9,38 @@ use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PiiConfig {
+    #[serde(default = "default_pii_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_pii_confidence_score")]
+    pub confidence_score: f64,
+    #[serde(default = "default_pii_action")]
+    pub action: String,
+}
+
+fn default_pii_enabled() -> bool { true }
+fn default_pii_confidence_score() -> f64 { 0.35 }
+fn default_pii_action() -> String { "redact".to_string() }
+
+impl Default for PiiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            confidence_score: 0.35,
+            action: "redact".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub listen_address: String,
     pub auth_token: String,
     pub pii_engine_url: String,
     pub pii_anonymize_url: Option<String>,
     pub managed_pii: Option<ManagedPiiConfig>,
+    #[serde(default)]
+    pub pii: PiiConfig,
     pub scan_timeout_ms: u64,
     pub fail_closed: bool,
     pub browser_heartbeat_ttl_ms: u64,
@@ -42,7 +68,16 @@ pub struct BlockingConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageConfig {
-    pub extension_id: String,
+    #[serde(default)]
+    pub chrome_extension_id: String,
+    #[serde(default)]
+    pub edge_extension_id: String,
+    #[serde(default)]
+    pub chrome_update_url: String,
+    #[serde(default)]
+    pub edge_update_url: String,
+    #[serde(default)]
+    pub extension_id: Option<String>,
     pub extension_version: String,
     pub extension_crx_path: PathBuf,
 }
@@ -72,6 +107,7 @@ impl AppConfig {
             .with_context(|| format!("failed to read config file {}", path.display()))?;
         let mut config: AppConfig = serde_json::from_str(&raw)
             .with_context(|| format!("failed to parse config file {}", path.display()))?;
+        config.package.normalize();
         let config_dir = path
             .parent()
             .ok_or_else(|| anyhow!("config path {} has no parent directory", path.display()))?;
@@ -135,6 +171,22 @@ impl AppConfig {
     pub fn base_url(&self) -> Result<String> {
         let addr = self.listen_socket_addr()?;
         Ok(format!("http://127.0.0.1:{}", addr.port()))
+    }
+}
+
+impl PackageConfig {
+    fn normalize(&mut self) {
+        if self.chrome_extension_id.trim().is_empty() {
+            if let Some(legacy) = self.extension_id.clone() {
+                self.chrome_extension_id = legacy;
+            }
+        }
+
+        if self.edge_extension_id.trim().is_empty() {
+            if let Some(legacy) = self.extension_id.clone() {
+                self.edge_extension_id = legacy;
+            }
+        }
     }
 }
 

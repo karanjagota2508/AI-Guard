@@ -4,8 +4,14 @@
   },
   "scan_response": {
     "action": "allow|block|redact",
+    "decision_kind": "clean|pii_detected|scan_error",
     "redacted_text": "string",
-    "reason": "string"
+    "reason": "string",
+    "detected_entity": "string|null"
+  },
+  "ready_response": {
+    "ok": true,
+    "reason": "string|null"
   },
   "activity_request": {
     "page_url": "string",

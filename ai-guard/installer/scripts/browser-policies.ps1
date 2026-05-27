@@ -397,6 +397,71 @@ function Set-AIGuardStateStringList {
     Set-RegistryStringValue -Hive $Hive -KeyPath $stateRoot -Name $Name -Value $json
 }
 
+function Set-AIGuardTrackedDwordPolicy {
+    param(
+        [Microsoft.Win32.RegistryHive]$Hive,
+        [ValidateSet("Chrome", "Edge")]
+        [string]$Browser,
+        [string]$Name,
+        [int]$Value
+    )
+
+    $policyRoot = Get-BrowserPolicyRoot -Browser $Browser
+    $stateRoot = Get-BrowserPolicyStateRoot -Browser $Browser
+    $trackedName = "$Name.Tracked"
+    $previousWasSetName = "$Name.PreviousWasSet"
+    $previousValueName = "$Name.PreviousValue"
+    $tracked = Get-RegistryStringValue -Hive $Hive -KeyPath $stateRoot -Name $trackedName
+
+    if (-not $tracked) {
+        $previousValue = Get-RegistryDwordValue -Hive $Hive -KeyPath $policyRoot -Name $Name
+        Set-RegistryStringValue -Hive $Hive -KeyPath $stateRoot -Name $trackedName -Value "true"
+        Set-RegistryStringValue -Hive $Hive -KeyPath $stateRoot -Name $previousWasSetName -Value ([string]($null -ne $previousValue)).ToLowerInvariant()
+
+        if ($null -ne $previousValue) {
+            Set-RegistryStringValue -Hive $Hive -KeyPath $stateRoot -Name $previousValueName -Value ([string]$previousValue)
+        } else {
+            Remove-RegistryValueIfPresent -Hive $Hive -KeyPath $stateRoot -Name $previousValueName
+        }
+    }
+
+    Set-RegistryDwordValue -Hive $Hive -KeyPath $policyRoot -Name $Name -Value $Value
+}
+
+function Restore-AIGuardTrackedDwordPolicy {
+    param(
+        [Microsoft.Win32.RegistryHive]$Hive,
+        [ValidateSet("Chrome", "Edge")]
+        [string]$Browser,
+        [string]$Name
+    )
+
+    $policyRoot = Get-BrowserPolicyRoot -Browser $Browser
+    $stateRoot = Get-BrowserPolicyStateRoot -Browser $Browser
+    $trackedName = "$Name.Tracked"
+    $previousWasSetName = "$Name.PreviousWasSet"
+    $previousValueName = "$Name.PreviousValue"
+    $tracked = Get-RegistryStringValue -Hive $Hive -KeyPath $stateRoot -Name $trackedName
+
+    if (-not $tracked) {
+        return
+    }
+
+    $previousWasSet = (Get-RegistryStringValue -Hive $Hive -KeyPath $stateRoot -Name $previousWasSetName) -eq "true"
+    if ($previousWasSet) {
+        $previousValue = Get-RegistryStringValue -Hive $Hive -KeyPath $stateRoot -Name $previousValueName
+        if ($previousValue -match '^\d+$') {
+            Set-RegistryDwordValue -Hive $Hive -KeyPath $policyRoot -Name $Name -Value ([int]$previousValue)
+        }
+    } else {
+        Remove-RegistryValueIfPresent -Hive $Hive -KeyPath $policyRoot -Name $Name
+    }
+
+    Remove-RegistryValueIfPresent -Hive $Hive -KeyPath $stateRoot -Name $trackedName
+    Remove-RegistryValueIfPresent -Hive $Hive -KeyPath $stateRoot -Name $previousWasSetName
+    Remove-RegistryValueIfPresent -Hive $Hive -KeyPath $stateRoot -Name $previousValueName
+}
+
 function Normalize-PolicyHostList {
     param(
         [string[]]$Hosts
@@ -447,6 +512,36 @@ function Remove-AIGuardBrowserHostBlocklistPolicy {
     Set-AIGuardStateStringList -Hive $Hive -Browser $Browser -Name $managedName -Values @()
 }
 
+function Remove-AIGuardBrowserHostBlocklistPolicyEntries {
+    param(
+        [Microsoft.Win32.RegistryHive]$Hive,
+        [ValidateSet("Chrome", "Edge")]
+        [string]$Browser,
+        [string[]]$Hosts
+    )
+
+    $policyPath = Join-Path (Get-BrowserPolicyRoot -Browser $Browser) "URLBlocklist"
+    $managedName = "ManagedUrlBlocklist"
+    $existing = @((Get-RegistryStringListValues -Hive $Hive -KeyPath $policyPath) | ForEach-Object { [string]$_ } | Where-Object { $_ })
+    $hostsToRemove = Normalize-PolicyHostList -Hosts $Hosts
+
+    if ($hostsToRemove.Count -eq 0 -and $existing.Count -eq 0) {
+        Set-AIGuardStateStringList -Hive $Hive -Browser $Browser -Name $managedName -Values @()
+        return
+    }
+
+    $remaining = @(
+        $existing |
+            Where-Object {
+                $normalized = ([string]$_).Trim().ToLowerInvariant().Trim('.')
+                $hostsToRemove -notcontains $normalized
+            }
+    )
+
+    Save-RegistryStringListValues -Hive $Hive -KeyPath $policyPath -Values $remaining
+    Set-AIGuardStateStringList -Hive $Hive -Browser $Browser -Name $managedName -Values @()
+}
+
 function Set-AIGuardPrivateBrowsingPolicy {
     param(
         [Microsoft.Win32.RegistryHive]$Hive,
@@ -461,6 +556,9 @@ function Set-AIGuardPrivateBrowsingPolicy {
 
     if (-not $Disable) {
         Restore-AIGuardPrivateBrowsingPolicy -Hive $Hive -Browser $Browser
+        if ((Get-RegistryDwordValue -Hive $Hive -KeyPath $policyRoot -Name $valueName) -eq 1) {
+            Remove-RegistryValueIfPresent -Hive $Hive -KeyPath $policyRoot -Name $valueName
+        }
         return
     }
 
@@ -682,11 +780,11 @@ function Set-ManagedExtensionPolicy {
 
     $policyRoot = Get-BrowserPolicyRoot -Browser $Browser
     if ($DisallowExtensionDeveloperMode) {
-        Set-RegistryDwordValue -Hive $Hive -KeyPath $policyRoot -Name "ExtensionDeveloperModeSettings" -Value 1
+        Set-AIGuardTrackedDwordPolicy -Hive $Hive -Browser $Browser -Name "ExtensionDeveloperModeSettings" -Value 1
     }
 
     if ($DisableDeveloperTools) {
-        Set-RegistryDwordValue -Hive $Hive -KeyPath $policyRoot -Name "DeveloperToolsAvailability" -Value 2
+        Set-AIGuardTrackedDwordPolicy -Hive $Hive -Browser $Browser -Name "DeveloperToolsAvailability" -Value 2
     }
 
     $privateBrowsingPolicyPath = Get-MandatoryPrivateBrowsingPolicyPath -Browser $Browser
@@ -719,4 +817,6 @@ function Remove-ManagedExtensionPolicy {
 
     Remove-AIGuardBrowserHostBlocklistPolicy -Hive $Hive -Browser $Browser
     Restore-AIGuardPrivateBrowsingPolicy -Hive $Hive -Browser $Browser
+    Restore-AIGuardTrackedDwordPolicy -Hive $Hive -Browser $Browser -Name "ExtensionDeveloperModeSettings"
+    Restore-AIGuardTrackedDwordPolicy -Hive $Hive -Browser $Browser -Name "DeveloperToolsAvailability"
 }

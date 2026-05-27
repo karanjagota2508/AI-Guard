@@ -1,8 +1,12 @@
 import os
+import threading
+import time
+from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from presidio_analyzer import AnalyzerEngine, RecognizerResult
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 from presidio_anonymizer import AnonymizerEngine
@@ -16,6 +20,34 @@ DEFAULT_ALLOWED_ORIGINS = "http://127.0.0.1,http://localhost"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
 DEFAULT_SPACY_MODEL = os.getenv("PII_SPACY_MODEL", "en_core_web_sm")
+DEFAULT_WARMUP_TEXT = "Warmup scan for John Doe in New York"
+
+
+class PiiReadinessState:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._ready = False
+        self._last_error: Optional[str] = None
+
+    def mark_ready(self) -> None:
+        with self._lock:
+            self._ready = True
+            self._last_error = None
+
+    def mark_unready(self, error: Optional[str] = None) -> None:
+        with self._lock:
+            self._ready = False
+            self._last_error = error
+
+    def snapshot(self) -> Dict[str, Optional[str] | bool]:
+        with self._lock:
+            return {
+                "ready": self._ready,
+                "last_error": self._last_error,
+            }
+
+
+PII_READINESS = PiiReadinessState()
 
 
 def parse_allowed_origins() -> List[str]:
@@ -24,7 +56,7 @@ def parse_allowed_origins() -> List[str]:
     return origins or [DEFAULT_ALLOWED_ORIGINS]
 
 
-app = FastAPI(title="Ultibot PII Agent")
+app = FastAPI(title="AI Guard Agent PII Service")
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,7 +77,33 @@ def create_analyzer() -> AnalyzerEngine:
     return AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["en"])
 
 
-analyzer = create_analyzer()
+@lru_cache(maxsize=1)
+def get_analyzer() -> AnalyzerEngine:
+    return create_analyzer()
+
+
+def warmup_pii_engine() -> AnalyzerEngine:
+    startup_delay_ms = int(os.getenv("PII_SERVICE_STARTUP_DELAY_MS", "0") or "0")
+    if startup_delay_ms > 0:
+        time.sleep(startup_delay_ms / 1000)
+
+    analyzer = get_analyzer()
+    analyzer.analyze(text=DEFAULT_WARMUP_TEXT, language="en")
+    PII_READINESS.mark_ready()
+    return analyzer
+
+
+def get_ready_analyzer() -> AnalyzerEngine:
+    snapshot = PII_READINESS.snapshot()
+    analyzer = get_analyzer()
+    if snapshot["ready"]:
+        return analyzer
+
+    analyzer.analyze(text=DEFAULT_WARMUP_TEXT, language="en")
+    PII_READINESS.mark_ready()
+    return analyzer
+
+
 anonymizer = AnonymizerEngine()
 
 
@@ -114,7 +172,7 @@ def build_operator(config: Optional[GlobalOperatorConfig]) -> OperatorConfig:
 
 def detect_entities(req: PiiDetectRequest) -> List[Dict[str, Any]]:
     entities = build_detect_entity_list(req.entities)
-    results = analyzer.analyze(
+    results = get_ready_analyzer().analyze(
         text=req.text,
         language="en",
         score_threshold=req.score_threshold,
@@ -200,6 +258,20 @@ def anonymize_detected_text(
     }
 
 
+@app.on_event("startup")
+async def startup_event():
+    # Eagerly load and warm up the PII analyzer engine on server boot to prevent cold-start timeouts
+    PII_READINESS.mark_unready("PII analyzer warmup has not completed yet.")
+    try:
+        print("Eagerly loading PII analyzer engine...")
+        print("Warming up spaCy model and Presidio recognizers...")
+        warmup_pii_engine()
+        print("PII analyzer engine successfully warmed up and ready for instant detection.")
+    except Exception as e:
+        PII_READINESS.mark_unready(str(e))
+        print(f"Warning: Eager PII analyzer warmup failed: {e}")
+
+
 @app.get("/")
 async def root():
     return {"service": "pii_agent", "status": "ok"}
@@ -213,6 +285,21 @@ async def health():
 @app.get("/healthz")
 async def healthz():
     return {"ok": True}
+
+
+@app.get("/readyz")
+async def readyz():
+    snapshot = PII_READINESS.snapshot()
+    if snapshot["ready"]:
+        return {"ok": True}
+
+    return JSONResponse(
+        status_code=503,
+        content={
+            "ok": False,
+            "reason": snapshot["last_error"] or "PII analyzer warmup has not completed yet.",
+        },
+    )
 
 
 @app.post("/api/pii/detect")

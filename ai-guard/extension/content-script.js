@@ -1,15 +1,14 @@
 const DEBOUNCE_MS = 300;
 const WARNING_ID = "ai-guard-warning";
-
-let cachedScan = {
-  text: "",
-  response: null,
-};
+const PII_WARNING_BAR_ID = "ai-guard-pii-warning-bar";
 
 let submitBypassUntil = 0;
 let submitInFlight = false;
 let inputTimer = null;
 let inputSequence = 0;
+let piiWarningActive = false;
+let activeRedactedText = "";
+let currentWarningKind = null;
 
 bootstrapClaudeObservers();
 
@@ -29,42 +28,9 @@ function bootstrapClaudeObservers() {
 }
 
 async function onPaste(event) {
-  const editor = resolveEditor(event.target);
-  if (!editor) {
-    return;
-  }
-
-  const pastedText = event.clipboardData?.getData("text/plain") || "";
-  if (!pastedText.trim()) {
-    return;
-  }
-
-  inputSequence += 1;
-  window.clearTimeout(inputTimer);
-  const selectionSnapshot = captureEditorSelection(editor);
-  event.preventDefault();
-  stopEvent(event);
+  // Let the browser paste naturally. Once the paste completes,
+  // the "input" event is automatically triggered and will call onInput()
   notifyActivity(true);
-
-  const response = await scanText(pastedText, "paste");
-  cachedScan = { text: pastedText, response };
-
-  if (response.action === "block") {
-    showWarning(response.reason);
-    return;
-  }
-
-  restoreEditorSelection(editor, selectionSnapshot);
-  insertTextAtCursor(
-    editor,
-    response.action === "redact"
-      ? response.redacted_text || pastedText
-      : pastedText,
-  );
-
-  if (response.action === "redact") {
-    showWarning(response.reason);
-  }
 }
 
 function onInput(event) {
@@ -83,6 +49,10 @@ function onInput(event) {
 
     const prompt = readEditorText(editor);
     if (!prompt.trim()) {
+      removePiiWarningBar();
+      highlightEditor(editor, false);
+      piiWarningActive = false;
+      activeRedactedText = "";
       return;
     }
 
@@ -91,7 +61,6 @@ function onInput(event) {
       return;
     }
 
-    cachedScan = { text: prompt, response };
     enforceDebouncedDecision(editor, prompt, response);
   }, DEBOUNCE_MS);
 }
@@ -156,6 +125,12 @@ async function handleSubmit(editor) {
     return;
   }
 
+  // If a PII warning is active, block submit and flash the warning bar!
+  if (piiWarningActive) {
+    flashWarningBar();
+    return;
+  }
+
   submitInFlight = true;
   inputSequence += 1;
   window.clearTimeout(inputTimer);
@@ -163,17 +138,13 @@ async function handleSubmit(editor) {
 
   try {
     const response = await scanText(prompt, "submit");
-    cachedScan = { text: prompt, response };
 
-    if (response.action === "block") {
-      showWarning(response.reason);
+    if (response.action !== "allow") {
+      enforceDebouncedDecision(editor, prompt, response);
+      if (piiWarningActive || currentWarningKind) {
+        flashWarningBar();
+      }
       return;
-    }
-
-    if (response.action === "redact") {
-      replaceEditorText(editor, response.redacted_text || prompt);
-      showWarning(response.reason);
-      await delay(75);
     }
 
     triggerSubmit(editor);
@@ -253,6 +224,10 @@ function isVisible(element) {
 }
 
 function isSendButton(button) {
+  if (button.id === "ai-guard-auto-anonymize") {
+    return false;
+  }
+
   const label =
     `${button.getAttribute("aria-label") || ""} ${button.getAttribute("title") || ""} ${button.textContent || ""}`.toLowerCase();
   const dataTestId = (button.getAttribute("data-testid") || "").toLowerCase();
@@ -279,6 +254,7 @@ function findSendButton() {
   );
 }
 
+// Editor text reading and replacing Helpers
 function readEditorText(editor) {
   if (
     editor instanceof HTMLTextAreaElement ||
@@ -338,11 +314,14 @@ function insertTextAtCursor(editor, value) {
 }
 
 function enforceDebouncedDecision(editor, scannedText, response) {
-  if (response.action === "allow") {
+  const decisionKind = decisionKindFor(response);
+  if (decisionKind === "clean") {
+    removePiiWarningBar();
+    highlightEditor(editor, false);
+    piiWarningActive = false;
+    activeRedactedText = "";
     return;
   }
-
-  showWarning(response.reason);
 
   const liveText = readEditorText(editor);
   const normalizedLiveText = normalizePromptText(liveText);
@@ -351,16 +330,52 @@ function enforceDebouncedDecision(editor, scannedText, response) {
     return;
   }
 
-  if (response.action !== "redact") {
+  if (decisionKind === "scan_error") {
+    piiWarningActive = false;
+    activeRedactedText = "";
+    highlightEditor(editor, false);
+    showPiiWarningBar(
+      editor,
+      response.reason || "PII scanning is temporarily unavailable.",
+      null,
+      "system",
+    );
     return;
   }
 
-  const replacement = response.redacted_text || scannedText;
-  if (!replacement || normalizePromptText(replacement) === normalizedLiveText) {
+  if (response.action === "allow") {
+    piiWarningActive = false;
+    activeRedactedText = "";
+    highlightEditor(editor, false);
+    showPiiWarningBar(
+      editor,
+      `Sensitive information detected: ${response.detected_entity || "PII"}`,
+      null,
+      "notice",
+    );
     return;
   }
 
-  replaceEditorText(editor, replacement);
+  piiWarningActive = true;
+  activeRedactedText = shouldOfferAutoAnonymize(response, scannedText)
+    ? response.redacted_text
+    : "";
+
+  highlightEditor(editor, true);
+  showPiiWarningBar(
+    editor,
+    `Sensitive information detected: ${response.detected_entity || "PII"}`,
+    activeRedactedText
+      ? () => {
+          replaceEditorText(editor, activeRedactedText);
+          removePiiWarningBar();
+          highlightEditor(editor, false);
+          piiWarningActive = false;
+          activeRedactedText = "";
+        }
+      : null,
+    "pii",
+  );
 }
 
 function normalizePromptText(value) {
@@ -450,11 +465,6 @@ function insertIntoContentEditableSelection(editor, value) {
 }
 
 function replaceContentEditableSelection(editor, value) {
-  const inserted = document.execCommand("insertText", false, value);
-  if (inserted) {
-    return;
-  }
-
   editor.textContent = "";
   const selection = window.getSelection();
   const range = document.createRange();
@@ -469,10 +479,6 @@ function replaceContentEditableSelection(editor, value) {
 }
 
 async function scanText(text, reason) {
-  if (cachedScan.text === text && cachedScan.response) {
-    return cachedScan.response;
-  }
-
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(
       {
@@ -482,11 +488,12 @@ async function scanText(text, reason) {
       },
       (response) => {
         if (chrome.runtime.lastError) {
-          resolve({
-            action: "block",
-            redacted_text: "",
-            reason: chrome.runtime.lastError.message,
-          });
+          resolve(createScanErrorResponse(`Ulti Guard is unavailable: ${chrome.runtime.lastError.message}`));
+          return;
+        }
+
+        if (!response || !response.action) {
+          resolve(createScanErrorResponse("Ulti Guard returned an empty scan response."));
           return;
         }
 
@@ -523,18 +530,28 @@ function showWarning(message) {
     banner.style.borderRadius = "12px";
     banner.style.background = "#8f1212";
     banner.style.color = "#ffffff";
-    banner.style.boxShadow = "0 12px 30px rgba(0, 0, 0, 0.2)";
+    banner.style.boxShadow = "0 12px 30px rgba(0, 0, 0, 0.25)";
     banner.style.font = "600 13px/1.4 system-ui, sans-serif";
+    banner.style.opacity = "0";
+    banner.style.transform = "translateY(-20px)";
+    banner.style.transition = "opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)";
     document.body.appendChild(banner);
   }
 
-  banner.textContent = `Ulti Guard Agent: ${message}`;
+  banner.textContent = `Ulti Guard: ${message}`;
+  
+  // Force reflow
+  banner.offsetHeight;
+
   banner.style.opacity = "1";
+  banner.style.transform = "translateY(0)";
+  
   window.clearTimeout(showWarning.timerId);
   showWarning.timerId = window.setTimeout(() => {
     const target = document.getElementById(WARNING_ID);
     if (target) {
       target.style.opacity = "0";
+      target.style.transform = "translateY(-20px)";
     }
   }, 4500);
 }
@@ -550,4 +567,244 @@ function stopEvent(event) {
 
 function delay(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+// PII Warning UI Helpers mirror the flow, behavior and premium look of Ultimize
+function createScanErrorResponse(message) {
+  return {
+    action: "block",
+    decision_kind: "scan_error",
+    redacted_text: "",
+    reason: message,
+    detected_entity: null,
+  };
+}
+
+function shouldOfferAutoAnonymize(response, scannedText) {
+  if (decisionKindFor(response) !== "pii_detected" || response.action !== "redact") {
+    return false;
+  }
+
+  const replacement = normalizePromptText(response.redacted_text || "");
+  return !!replacement && replacement !== normalizePromptText(scannedText);
+}
+
+function decisionKindFor(response) {
+  if (response?.decision_kind) {
+    return response.decision_kind;
+  }
+
+  if (response?.action === "allow" && !response?.detected_entity) {
+    return "clean";
+  }
+
+  return "pii_detected";
+}
+
+function createPiiWarningBar(message, onAnonymize, kind = "pii") {
+  let bar = document.getElementById(PII_WARNING_BAR_ID);
+  if (bar) {
+    bar.remove();
+  }
+
+  bar = document.createElement("div");
+  bar.id = PII_WARNING_BAR_ID;
+  bar.style.display = "flex";
+  bar.style.alignItems = "center";
+  bar.style.justifyContent = "space-between";
+  bar.style.background = "#fff5f5";
+  bar.style.border = "1px solid #feb2b2";
+  bar.style.borderRadius = "8px";
+  bar.style.padding = "8px 14px";
+  bar.style.marginTop = "8px";
+  bar.style.marginBottom = "8px";
+  bar.style.fontFamily = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  bar.style.boxSizing = "border-box";
+  bar.style.width = "100%";
+  bar.style.transition = "all 0.3s ease";
+
+  const palette =
+    kind === "pii"
+      ? {
+          background: "#fff5f5",
+          border: "#feb2b2",
+          text: "#c53030",
+          icon: "#e53e3e",
+          darkBackground: "#2d1a1a",
+          darkBorder: "#742a2a",
+          darkText: "#feb2b2",
+        }
+      : {
+          background: "#fffaf0",
+          border: "#f6ad55",
+          text: "#9c4221",
+          icon: "#dd6b20",
+          darkBackground: "#2b2114",
+          darkBorder: "#9c4221",
+          darkText: "#fbd38d",
+        };
+
+  bar.style.background = palette.background;
+  bar.style.border = `1px solid ${palette.border}`;
+
+  // Check if dark mode is active to adjust colors
+  const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if (isDarkMode) {
+    bar.style.background = palette.darkBackground;
+    bar.style.border = `1px solid ${palette.darkBorder}`;
+  }
+
+  // Left Content (Icon + Warning message)
+  const leftContainer = document.createElement("div");
+  leftContainer.style.display = "flex";
+  leftContainer.style.alignItems = "center";
+  leftContainer.style.gap = "8px";
+
+  // Warning/Alert Icon SVG
+  const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  icon.setAttribute("width", "16");
+  icon.setAttribute("height", "16");
+  icon.setAttribute("viewBox", "0 0 24 24");
+  icon.setAttribute("fill", "none");
+  icon.setAttribute("stroke", palette.icon);
+  icon.setAttribute("stroke-width", "2");
+  icon.setAttribute("stroke-linecap", "round");
+  icon.setAttribute("stroke-linejoin", "round");
+  
+  const path1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path1.setAttribute("d", "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z");
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  line.setAttribute("x1", "12");
+  line.setAttribute("y1", "9");
+  line.setAttribute("x2", "12");
+  line.setAttribute("y2", "13");
+  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  circle.setAttribute("cx", "12");
+  circle.setAttribute("cy", "17");
+  circle.setAttribute("r", "0.5");
+  circle.setAttribute("fill", palette.icon);
+
+  icon.appendChild(path1);
+  icon.appendChild(line);
+  icon.appendChild(circle);
+
+  const textLabel = document.createElement("span");
+  textLabel.textContent = message;
+  textLabel.style.color = palette.text;
+  textLabel.style.fontSize = "13px";
+  textLabel.style.fontWeight = "500";
+  if (isDarkMode) {
+    textLabel.style.color = palette.darkText;
+  }
+
+  leftContainer.appendChild(icon);
+  leftContainer.appendChild(textLabel);
+
+  bar.appendChild(leftContainer);
+
+  // Right Content (Auto-Anonymize button) - Only create/append if onAnonymize callback is provided
+  if (onAnonymize) {
+    const anonymizeBtn = document.createElement("button");
+    anonymizeBtn.id = "ai-guard-auto-anonymize";
+    anonymizeBtn.type = "button";
+    anonymizeBtn.textContent = "Auto-Anonymize";
+    anonymizeBtn.style.background = "#f1f5f9";
+    anonymizeBtn.style.color = "#334155";
+    anonymizeBtn.style.border = "1px solid #cbd5e1";
+    anonymizeBtn.style.borderRadius = "6px";
+    anonymizeBtn.style.padding = "6px 12px";
+    anonymizeBtn.style.fontSize = "12px";
+    anonymizeBtn.style.fontWeight = "600";
+    anonymizeBtn.style.cursor = "pointer";
+    anonymizeBtn.style.transition = "all 0.2s ease";
+
+    anonymizeBtn.addEventListener("mouseover", () => {
+      anonymizeBtn.style.background = "#cbd5e1";
+    });
+    anonymizeBtn.addEventListener("mouseout", () => {
+      anonymizeBtn.style.background = "#f1f5f9";
+    });
+
+    anonymizeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onAnonymize();
+    });
+
+    bar.appendChild(anonymizeBtn);
+  }
+
+  return bar;
+}
+
+function showPiiWarningBar(editor, message, onAnonymize, kind = "pii") {
+  let bar = document.getElementById(PII_WARNING_BAR_ID);
+  if (bar) {
+    bar.remove();
+  }
+
+  bar = createPiiWarningBar(message, onAnonymize, kind);
+  currentWarningKind = kind;
+
+  // Insert below the outer container that holds the Claude editor text input area
+  const insertionPoint = editor.closest('.flex.flex-col') || editor;
+  if (insertionPoint && insertionPoint.parentNode) {
+    insertionPoint.parentNode.insertBefore(bar, insertionPoint.nextSibling);
+  }
+}
+
+function removePiiWarningBar() {
+  const bar = document.getElementById(PII_WARNING_BAR_ID);
+  if (bar) {
+    bar.remove();
+  }
+  currentWarningKind = null;
+}
+
+function highlightEditor(editor, highlight) {
+  if (!editor) return;
+
+  const borderContainer = editor.closest('.flex.flex-col') || editor;
+
+  if (highlight) {
+    if (!borderContainer.dataset.hasOriginalStyles) {
+      borderContainer.dataset.originalBorder = borderContainer.style.border || "";
+      borderContainer.dataset.originalBoxShadow = borderContainer.style.boxShadow || "";
+      borderContainer.dataset.originalBorderColor = borderContainer.style.borderColor || "";
+      borderContainer.dataset.hasOriginalStyles = "true";
+    }
+
+    borderContainer.style.borderColor = "#e53e3e";
+    borderContainer.style.boxShadow = "0 0 0 2px rgba(229, 62, 62, 0.25)";
+  } else {
+    if (borderContainer.dataset.hasOriginalStyles === "true") {
+      borderContainer.style.border = borderContainer.dataset.originalBorder;
+      borderContainer.style.boxShadow = borderContainer.dataset.originalBoxShadow;
+      borderContainer.style.borderColor = borderContainer.dataset.originalBorderColor;
+    }
+  }
+}
+
+function flashWarningBar() {
+  const bar = document.getElementById(PII_WARNING_BAR_ID);
+  if (!bar) return;
+
+  bar.style.transform = "translateX(10px)";
+  setTimeout(() => { bar.style.transform = "translateX(-10px)"; }, 80);
+  setTimeout(() => { bar.style.transform = "translateX(5px)"; }, 160);
+  setTimeout(() => { bar.style.transform = "translateX(-5px)"; }, 240);
+  setTimeout(() => { bar.style.transform = "translateX(0)"; }, 320);
+
+  const editor = findPrimaryEditor();
+  if (editor && currentWarningKind === "pii" && piiWarningActive) {
+    const borderContainer = editor.closest('.flex.flex-col') || editor;
+    borderContainer.style.boxShadow = "0 0 0 4px rgba(229, 62, 62, 0.4)";
+    setTimeout(() => {
+      if (piiWarningActive) {
+        borderContainer.style.boxShadow = "0 0 0 2px rgba(229, 62, 62, 0.25)";
+      } else {
+        borderContainer.style.boxShadow = "";
+      }
+    }, 500);
+  }
 }

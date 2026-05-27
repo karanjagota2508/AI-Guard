@@ -1,6 +1,6 @@
 # PII Agent
 
-`PII_agent` is the standalone Presidio-based PII detection and anonymization service for Ultibot.
+`PII_agent` is the standalone Presidio-based PII detection and anonymization service used by AI Guard Agent.
 
 ## Structure
 

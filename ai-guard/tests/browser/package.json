@@ -1,5 +1,5 @@
 {
-  "name": "ulti-guard-browser-tests",
+  "name": "ai-guard-browser-tests",
   "private": true,
   "type": "module",
   "dependencies": {

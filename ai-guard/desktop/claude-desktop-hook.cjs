@@ -11,10 +11,6 @@ const BRIDGE_CONFIG_PATH = path.join(
 );
 
 let bridgeConfig = null;
-let cachedScan = {
-  text: "",
-  response: null,
-};
 let submitBypassUntil = 0;
 let submitInFlight = false;
 let inputTimer = null;
@@ -83,7 +79,7 @@ function loadBridgeConfig() {
     return parsed;
   } catch (error) {
     console.error(
-      "Ulti Guard Agent: failed to load Claude Desktop bridge config",
+      "Ulti Guard: failed to load Claude Desktop bridge config",
       error,
     );
     return null;
@@ -115,7 +111,6 @@ async function onPaste(event) {
   stopEvent(event);
 
   const response = await scanText(pastedText, "desktop_paste");
-  cachedScan = { text: pastedText, response };
 
   if (response.action === "block") {
     showWarning(response.reason);
@@ -158,7 +153,6 @@ function onInput(event) {
       return;
     }
 
-    cachedScan = { text: prompt, response };
     enforceDebouncedDecision(editor, prompt, response);
   }, DEBOUNCE_MS);
 }
@@ -187,7 +181,7 @@ function onKeyDown(event) {
   stopEvent(event);
   handleSubmit(editor).catch((error) => {
     console.error(
-      "Ulti Guard Agent: Claude Desktop submit interception failed",
+      "Ulti Guard: Claude Desktop submit interception failed",
       error,
     );
     showWarning("Claude Desktop prompt guard failed");
@@ -214,7 +208,7 @@ function onClick(event) {
   stopEvent(event);
   handleSubmit(editor).catch((error) => {
     console.error(
-      "Ulti Guard Agent: Claude Desktop click submit interception failed",
+      "Ulti Guard: Claude Desktop click submit interception failed",
       error,
     );
     showWarning("Claude Desktop prompt guard failed");
@@ -237,7 +231,6 @@ async function handleSubmit(editor) {
 
   try {
     const response = await scanText(prompt, "desktop_submit");
-    cachedScan = { text: prompt, response };
 
     if (response.action === "block") {
       showWarning(response.reason);
@@ -409,7 +402,7 @@ function insertTextAtCursor(editor, value) {
 }
 
 function enforceDebouncedDecision(editor, scannedText, response) {
-  if (response.action === "allow") {
+  if (decisionKindFor(response) === "clean") {
     return;
   }
 
@@ -422,7 +415,7 @@ function enforceDebouncedDecision(editor, scannedText, response) {
     return;
   }
 
-  if (response.action !== "redact") {
+  if (decisionKindFor(response) !== "pii_detected" || response.action !== "redact") {
     return;
   }
 
@@ -521,11 +514,6 @@ function insertIntoContentEditableSelection(editor, value) {
 }
 
 function replaceContentEditableSelection(editor, value) {
-  const inserted = document.execCommand("insertText", false, value);
-  if (inserted) {
-    return;
-  }
-
   editor.textContent = "";
   const selection = window.getSelection();
   const range = document.createRange();
@@ -540,21 +528,45 @@ function replaceContentEditableSelection(editor, value) {
 }
 
 async function scanText(text, reason) {
-  if (cachedScan.text === text && cachedScan.response) {
-    return cachedScan.response;
-  }
-
-  return desktopBridgeRequest("/scan", {
+  const response = await desktopBridgeRequest("/scan", {
     method: "POST",
     body: {
       text,
     },
     reason,
-  }).catch((error) => ({
+  }).catch((error) =>
+    createScanErrorResponse(`Claude Desktop scan failed: ${error.message}`),
+  );
+
+  if (!response || !response.action) {
+    return createScanErrorResponse(
+      "Claude Desktop scan failed: empty response from the local daemon.",
+    );
+  }
+
+  return response;
+}
+
+function createScanErrorResponse(reason) {
+  return {
     action: "block",
+    decision_kind: "scan_error",
     redacted_text: "",
-    reason: `Claude Desktop scan failed: ${error.message}`,
-  }));
+    reason,
+    detected_entity: null,
+  };
+}
+
+function decisionKindFor(response) {
+  if (response?.decision_kind) {
+    return response.decision_kind;
+  }
+
+  if (response?.action === "allow" && !response?.detected_entity) {
+    return "clean";
+  }
+
+  return "pii_detected";
 }
 
 function desktopBridgeRequest(routePath, options) {
@@ -611,7 +623,7 @@ function desktopBridgeRequest(routePath, options) {
 }
 
 function showWarning(message) {
-  const text = message || "Ulti Guard Agent blocked this Claude Desktop prompt.";
+  const text = message || "Ulti Guard blocked this Claude Desktop prompt.";
   let toast = document.getElementById(WARNING_ID);
   if (!toast) {
     toast = document.createElement("div");
@@ -635,7 +647,7 @@ function showWarning(message) {
     document.documentElement.appendChild(toast);
   }
 
-  toast.textContent = `Ulti Guard Agent: ${text}`;
+  toast.textContent = `Ulti Guard: ${text}`;
   positionWarningToast(toast);
   window.clearTimeout(showWarning.timerId);
   showWarning.timerId = window.setTimeout(() => {

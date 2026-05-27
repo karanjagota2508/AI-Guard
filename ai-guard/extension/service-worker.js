@@ -1,11 +1,8 @@
 const NATIVE_HOST = "com.wininfosoft.ai_guard";
 const CLAUDE_HOSTS = ["claude.ai", "claude.com"];
-const TEST_PAGE_PREFIXES = [
-  "http://127.0.0.1:48555/__ulti_guard_test__/",
-  "http://localhost:48555/__ulti_guard_test__/",
-];
 const STATUS_CACHE_TTL_MS = 2000;
 const CLAUDE_PRESENCE_CACHE_TTL_MS = 1000;
+const BOOTSTRAP_CACHE_KEY = "aiGuardBootstrap";
 
 const daemonState = {
   baseUrl: "http://127.0.0.1:48555",
@@ -15,6 +12,7 @@ const daemonState = {
     "chat.openai.com",
     "gemini.google.com",
     "perplexity.ai",
+    "www.perplexity.ai",
   ],
   mode: "idle",
   activeSources: [],
@@ -87,8 +85,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch((error) =>
         sendResponse({
           action: "block",
-          redacted_text: "",
-          reason: `Ulti Guard Agent is unavailable: ${error.message}`,
+          decision_kind: "scan_error",
+          redacted_text: message.text || "",
+          reason: `Ulti Guard is unavailable: ${error.message}`,
+          detected_entity: null,
         }),
       );
     return true;
@@ -121,11 +121,23 @@ async function bootstrap() {
     return daemonState;
   }
 
+  const cachedState = await loadCachedBootstrapState();
+  if (cachedState) {
+    applyBootstrapResponse(cachedState);
+    return daemonState;
+  }
+
   const response = await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
     type: "hello",
     extension_id: chrome.runtime.id,
   });
 
+  applyBootstrapResponse(response);
+  await persistBootstrapState(response);
+  return daemonState;
+}
+
+function applyBootstrapResponse(response) {
   if (!response || response.type !== "hello") {
     throw new Error(response?.message || "native bootstrap failed");
   }
@@ -137,7 +149,6 @@ async function bootstrap() {
     : daemonState.blockedHosts;
   daemonState.mode = response.mode || daemonState.mode;
   daemonState.lastStatusAt = Date.now();
-  return daemonState;
 }
 
 async function daemonFetch(path, options = {}) {
@@ -184,6 +195,7 @@ async function retryDaemonFetch(path, options, originalError) {
   daemonState.token = null;
   daemonState.baseUrl = "http://127.0.0.1:48555";
   daemonState.lastStatusAt = 0;
+  await clearBootstrapCache();
   await bootstrap();
   return daemonFetch(path, { ...options, __retried: true });
 }
@@ -284,16 +296,17 @@ async function evaluateTab(tabId, url) {
     return;
   }
 
-  await syncClaudePresence();
-  const status = await refreshStatus(isClaudeUrl(url));
   if (isGuardSourceUrl(url)) {
+    await syncClaudePresence({ force: true });
+    await refreshStatus(true);
     return;
   }
 
-  if (status.mode !== "active") {
+  if (!matchesBlockedHost(url)) {
     return;
   }
 
+  await refreshStatus();
   if (!matchesBlockedHost(url)) {
     return;
   }
@@ -334,15 +347,7 @@ function isClaudeUrl(url) {
 }
 
 function isGuardSourceUrl(url) {
-  if (!url) {
-    return false;
-  }
-
-  if (isClaudeUrl(url)) {
-    return true;
-  }
-
-  return TEST_PAGE_PREFIXES.some((prefix) => url.startsWith(prefix));
+  return !!url && isClaudeUrl(url);
 }
 
 function hostnameForUrl(url) {
@@ -363,4 +368,60 @@ function matchesHost(hostname, candidates) {
 function blockedPageUrl(originalUrl) {
   const params = new URLSearchParams({ target: originalUrl });
   return chrome.runtime.getURL(`blocked.html?${params.toString()}`);
+}
+
+async function loadCachedBootstrapState() {
+  const storage = await bootstrapStorageArea();
+  if (!storage) {
+    return null;
+  }
+
+  const cached = await storage.get(BOOTSTRAP_CACHE_KEY);
+  const payload = cached?.[BOOTSTRAP_CACHE_KEY];
+  if (!payload || payload.extension_id !== chrome.runtime.id) {
+    return null;
+  }
+
+  return payload;
+}
+
+async function persistBootstrapState(response) {
+  const storage = await bootstrapStorageArea();
+  if (!storage || !response || response.type !== "hello") {
+    return;
+  }
+
+  await storage.set({
+    [BOOTSTRAP_CACHE_KEY]: {
+      type: response.type,
+      token: response.token,
+      base_url: response.base_url,
+      extension_id: response.extension_id,
+      mode: response.mode,
+      blocked_hosts: Array.isArray(response.blocked_hosts)
+        ? response.blocked_hosts
+        : [],
+    },
+  });
+}
+
+async function clearBootstrapCache() {
+  const storage = await bootstrapStorageArea();
+  if (!storage) {
+    return;
+  }
+
+  await storage.remove(BOOTSTRAP_CACHE_KEY);
+}
+
+async function bootstrapStorageArea() {
+  if (chrome.storage?.session) {
+    return chrome.storage.session;
+  }
+
+  if (chrome.storage?.local) {
+    return chrome.storage.local;
+  }
+
+  return null;
 }

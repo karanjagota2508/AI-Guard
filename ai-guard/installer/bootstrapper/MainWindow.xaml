@@ -1,0 +1,274 @@
+<Window x:Class="AIGuard.Setup.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Ulti Guard Setup"
+        Width="920"
+        Height="680"
+        MinWidth="920"
+        MinHeight="680"
+        WindowStartupLocation="CenterScreen"
+        Background="#F4F6FA">
+  <Window.Resources>
+    <!-- Premium Primary Button Style -->
+    <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+      <Setter Property="Background" Value="#D36530" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Padding" Value="16,8" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border Name="Border" 
+                    Background="{TemplateBinding Background}" 
+                    CornerRadius="8" 
+                    Padding="{TemplateBinding Padding}"
+                    SnapsToDevicePixels="True">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Border" Property="Background" Value="#E07643" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="Border" Property="Background" Value="#B25022" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Border" Property="Background" Value="#D7DEE8" />
+                <Setter Property="Foreground" Value="#71869E" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Premium Standard Button Style -->
+    <Style TargetType="Button">
+      <Setter Property="Background" Value="#E6ECF4" />
+      <Setter Property="Foreground" Value="#2D3B4E" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Padding" Value="16,8" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border Name="Border" 
+                    Background="{TemplateBinding Background}" 
+                    CornerRadius="8" 
+                    Padding="{TemplateBinding Padding}"
+                    SnapsToDevicePixels="True">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Border" Property="Background" Value="#D8E2ED" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="Border" Property="Background" Value="#C2CFDE" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Border" Property="Background" Value="#F0F4F8" />
+                <Setter Property="Foreground" Value="#BACAD6" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+
+  <Grid Margin="24">
+    <Grid x:Name="SetupContentGrid">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <Border Grid.Row="0"
+              Background="#10233B"
+              CornerRadius="22"
+              Padding="24"
+              Margin="0,0,0,18">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <Image x:Name="LogoImage"
+                 Width="148"
+                 Height="62"
+                 Margin="0,0,22,0"
+                 Stretch="Uniform" />
+          <StackPanel Grid.Column="1">
+            <TextBlock Text="Ulti Guard Setup"
+                       Foreground="White"
+                       FontSize="30"
+                       FontWeight="SemiBold" />
+            <TextBlock Text="Deploy the daemon service, managed browser extension, Claude Desktop protection path, local PII runtime, and the admin console in one install."
+                       Margin="0,10,0,0"
+                       Foreground="#DEE7F2"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="1"
+              Background="#FFF3CD"
+              BorderBrush="#E7C972"
+              BorderThickness="1"
+              CornerRadius="16"
+              Padding="18"
+              Margin="0,0,0,18">
+        <TextBlock Text="This setup runs machine-wide with administrator approval, provisions the local Python runtime automatically, and can restart Chrome or Edge so managed extension policy activates immediately."
+                   Foreground="#6A4F00"
+                   TextWrapping="Wrap" />
+      </Border>
+
+      <TextBox x:Name="LogTextBox"
+               Grid.Row="2"
+               IsReadOnly="True"
+               TextWrapping="Wrap"
+               VerticalScrollBarVisibility="Auto"
+               HorizontalScrollBarVisibility="Auto"
+               FontFamily="Consolas"
+               FontSize="13"
+               Padding="14"
+               Background="White"
+               BorderBrush="#D7DEE8"
+               BorderThickness="1" />
+
+      <DockPanel Grid.Row="3" Margin="0,18,0,0">
+        <StackPanel DockPanel.Dock="Left">
+          <ProgressBar x:Name="ProgressBar"
+                       Width="220"
+                       Height="18"
+                       VerticalAlignment="Center" />
+          <TextBlock x:Name="BuildInfoTextBlock"
+                     Margin="0,8,0,0"
+                     Foreground="#5C6D80"
+                     FontSize="11"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
+          <Button x:Name="InstallButton"
+                  Width="156"
+                  Height="40"
+                  Margin="0,0,12,0"
+                  Content="Install"
+                  Style="{StaticResource PrimaryButtonStyle}"
+                  Click="InstallButton_Click" />
+          <Button x:Name="UninstallButton"
+                  Width="112"
+                  Height="40"
+                  Margin="0,0,12,0"
+                  Content="Uninstall"
+                  Click="UninstallButton_Click" />
+          <Button x:Name="CloseButton"
+                  Width="92"
+                  Height="40"
+                  Content="Close"
+                  Click="CloseButton_Click" />
+        </StackPanel>
+      </DockPanel>
+    </Grid>
+
+    <Grid x:Name="FinishOverlayGrid"
+          Background="#F4F6FA"
+          Visibility="Collapsed">
+      <Border Background="White"
+              CornerRadius="22"
+              Padding="28"
+              BorderBrush="#D7DEE8"
+              BorderThickness="1"
+              VerticalAlignment="Center"
+              HorizontalAlignment="Stretch">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+
+          <TextBlock x:Name="FinishTitleTextBlock"
+                     Grid.Row="0"
+                     FontSize="28"
+                     FontWeight="SemiBold"
+                     Foreground="#10233B" />
+
+          <Border Grid.Row="1"
+                  x:Name="FinishWarningBanner"
+                  Margin="0,16,0,0"
+                  Padding="14,12"
+                  Background="#FFF3CD"
+                  BorderBrush="#E7C972"
+                  BorderThickness="1"
+                  CornerRadius="14"
+                  Visibility="Collapsed">
+            <TextBlock x:Name="FinishWarningTextBlock"
+                       Foreground="#6A4F00"
+                       TextWrapping="Wrap" />
+          </Border>
+
+          <Border Grid.Row="2"
+                  Margin="0,18,0,0"
+                  Padding="16"
+                  Background="#F8FAFD"
+                  BorderBrush="#D7DEE8"
+                  BorderThickness="1"
+                  CornerRadius="18">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+              <TextBlock x:Name="FinishMessageTextBlock"
+                         Foreground="#10233B"
+                         LineHeight="20"
+                         TextWrapping="Wrap" />
+            </ScrollViewer>
+          </Border>
+
+          <StackPanel Grid.Row="3"
+                      Margin="0,18,0,0">
+            <TextBlock x:Name="FinishHintTextBlock"
+                       Foreground="#5C6D80"
+                       TextWrapping="Wrap" />
+            <TextBlock x:Name="FinishBuildInfoTextBlock"
+                       Margin="0,10,0,0"
+                       Foreground="#5C6D80"
+                       FontSize="11"
+                       TextWrapping="Wrap" />
+            <StackPanel x:Name="FinishBusyPanel"
+                        Orientation="Horizontal"
+                        Margin="0,12,0,0"
+                        Visibility="Collapsed">
+              <ProgressBar Width="140"
+                           Height="8"
+                           IsIndeterminate="True"
+                           VerticalAlignment="Center" />
+              <TextBlock x:Name="FinishBusyTextBlock"
+                         Margin="12,0,0,0"
+                         VerticalAlignment="Center"
+                         Foreground="#10233B"
+                         FontWeight="SemiBold"
+                         Text="Finishing..." />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="0,16,0,0">
+              <Button x:Name="FinishButton"
+                      Width="96"
+                      Height="40"
+                      Content="Finish"
+                      Style="{StaticResource PrimaryButtonStyle}"
+                      Click="FinishButton_Click" />
+            </StackPanel>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</Window>

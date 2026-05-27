@@ -100,3 +100,51 @@ impl GuardController {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::thread;
+
+    use super::GuardController;
+    use crate::contracts::GuardMode;
+
+    #[test]
+    fn enters_active_mode_when_browser_activity_is_noted() {
+        let controller = GuardController::new(
+            std::time::Duration::from_millis(50),
+            std::time::Duration::from_millis(50),
+        );
+
+        let snapshot = controller.note_browser_activity(true);
+        assert_eq!(snapshot.mode, GuardMode::Active);
+        assert_eq!(snapshot.active_sources, vec!["claude_web"]);
+    }
+
+    #[test]
+    fn returns_to_idle_when_activity_expires() {
+        let controller = GuardController::new(
+            std::time::Duration::from_millis(20),
+            std::time::Duration::from_millis(20),
+        );
+
+        controller.note_browser_activity(true);
+        thread::sleep(std::time::Duration::from_millis(35));
+
+        let snapshot = controller.snapshot();
+        assert_eq!(snapshot.mode, GuardMode::Idle);
+        assert!(snapshot.active_sources.is_empty());
+    }
+
+    #[test]
+    fn keeps_both_sources_when_browser_and_desktop_are_active() {
+        let controller = GuardController::new(
+            std::time::Duration::from_millis(50),
+            std::time::Duration::from_millis(50),
+        );
+
+        controller.note_browser_activity(true);
+        let snapshot = controller.note_desktop_activity(true);
+        assert_eq!(snapshot.mode, GuardMode::Active);
+        assert_eq!(snapshot.active_sources.len(), 2);
+    }
+}

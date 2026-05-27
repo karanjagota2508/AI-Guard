@@ -1,7 +1,7 @@
 param(
     [string]$ConfigPath = "",
     [string]$HookSourcePath = "",
-    [string]$TargetRoot = "$env:LOCALAPPDATA\Ulti Guard Agent\claude-desktop",
+    [string]$TargetRoot = "$env:LOCALAPPDATA\AI Guard Agent\claude-desktop",
     [string]$LauncherScriptPath = "",
     [string]$PatchScriptPath = "",
     [string]$UiaGuardScriptPath = "",
@@ -125,7 +125,7 @@ if (-not (Test-Path $PatchScriptPath)) {
 
 $sourceAppPath = Get-StoreClaudeAppPath -Root $StoreAppsRoot
 if (-not $sourceAppPath) {
-    Write-Host "Ulti Guard Agent: no WindowsApps Claude Desktop package found under $StoreAppsRoot"
+    Write-Host "Ulti Guard: no WindowsApps Claude Desktop package found under $StoreAppsRoot"
     return
 }
 
@@ -159,13 +159,13 @@ if ('$UiaGuardScriptPath' -and (Test-Path '$UiaGuardScriptPath')) {
     Start-Sleep -Milliseconds 750
   }
 }
-Start-Process -FilePath '$storeExePath' -ArgumentList '--force-renderer-accessibility' -WorkingDirectory '$(Split-Path $storeExePath -Parent)'
+Start-Process -FilePath '$targetExePath' -ArgumentList '--force-renderer-accessibility' -WorkingDirectory '$(Split-Path $targetExePath -Parent)'
 "@
     Write-Utf8NoBomFile -Path $LauncherScriptPath -Content $launcherContent
 }
 
-Write-Host "Ulti Guard Agent: synced WindowsApps Claude Desktop -> $targetAppRoot"
+Write-Host "Ulti Guard: synced WindowsApps Claude Desktop -> $targetAppRoot"
 
-if ($Launch -and (Test-Path $storeExePath)) {
-    Start-Process -FilePath $storeExePath -ArgumentList "--force-renderer-accessibility" -WorkingDirectory (Split-Path $storeExePath -Parent)
+if ($Launch -and (Test-Path $targetExePath)) {
+    Start-Process -FilePath $targetExePath -ArgumentList "--force-renderer-accessibility" -WorkingDirectory (Split-Path $targetExePath -Parent)
 }

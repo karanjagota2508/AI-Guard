@@ -4,20 +4,21 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <AssemblyName>Ulti-Guard-Setup</AssemblyName>
-    <RootNamespace>UltiGuardSetup</RootNamespace>
+    <AssemblyName>Ulti Guard Setup</AssemblyName>
+    <RootNamespace>AIGuard.Setup</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>brand-icon.ico</ApplicationIcon>
+    <AssemblyTitle>Ulti Guard Setup</AssemblyTitle>
+    <Product>Ulti Guard Setup</Product>
+    <FileDescription>Ulti Guard Setup</FileDescription>
+    <OriginalFilename>Ulti Guard Setup.exe</OriginalFilename>
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="payload.zip" LogicalName="UltiGuardSetup.Payload.zip" />
-    <EmbeddedResource Include="brand-logo.png" LogicalName="UltiGuardSetup.BrandLogo.png" />
-    <EmbeddedResource Include="brand-icon.ico" LogicalName="UltiGuardSetup.BrandIcon.ico" />
-    <EmbeddedResource Include="..\install.ps1" LogicalName="UltiGuardSetup.Scripts.install.ps1" />
-    <EmbeddedResource Include="..\install-enterprise.ps1" LogicalName="UltiGuardSetup.Scripts.install-enterprise.ps1" />
-    <EmbeddedResource Include="..\uninstall.ps1" LogicalName="UltiGuardSetup.Scripts.uninstall.ps1" />
+    <EmbeddedResource Include="payload.zip" LogicalName="AIGuardSetup.Payload.zip" />
+    <EmbeddedResource Include="brand-logo.png" LogicalName="AIGuardSetup.BrandLogo.png" />
+    <EmbeddedResource Include="brand-icon.ico" LogicalName="AIGuardSetup.BrandIcon.ico" />
   </ItemGroup>
 </Project>

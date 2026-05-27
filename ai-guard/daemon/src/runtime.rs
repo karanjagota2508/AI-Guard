@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Context, Result, anyhow};
 use tokio::net::TcpListener;
@@ -19,6 +20,34 @@ pub struct AppState {
     pub config: Arc<AppConfig>,
     pub guard: Arc<GuardController>,
     pub pii: Arc<PiiClient>,
+    pub pii_readiness: PiiServiceReadiness,
+}
+
+#[derive(Clone, Debug)]
+pub struct PiiServiceReadiness {
+    requires_ready: bool,
+    ready: Arc<AtomicBool>,
+}
+
+impl PiiServiceReadiness {
+    pub fn new(requires_ready: bool) -> Self {
+        Self {
+            requires_ready,
+            ready: Arc::new(AtomicBool::new(!requires_ready)),
+        }
+    }
+
+    pub fn is_ready(&self) -> bool {
+        !self.requires_ready || self.ready.load(Ordering::SeqCst)
+    }
+
+    pub fn requires_ready(&self) -> bool {
+        self.requires_ready
+    }
+
+    pub fn mark_ready(&self, ready: bool) {
+        self.ready.store(ready, Ordering::SeqCst);
+    }
 }
 
 impl AppState {
@@ -28,29 +57,58 @@ impl AppState {
             config.browser_heartbeat_ttl(),
             config.desktop_activity_ttl(),
         );
+        let requires_ready = config.pii.enabled
+            && config
+                .managed_pii
+                .as_ref()
+                .is_some_and(|item| item.enabled);
+        let pii_readiness = PiiServiceReadiness::new(requires_ready);
 
         Ok(Self {
             config: Arc::new(config),
             guard: Arc::new(guard),
             pii: Arc::new(pii),
+            pii_readiness,
         })
     }
 
+    pub fn pii_ready(&self) -> bool {
+        self.pii_readiness.is_ready()
+    }
+
     pub fn extension_update_manifest(&self) -> String {
+        let app_ids = self
+            .config
+            .extension_ids
+            .iter()
+            .filter(|item| !item.trim().is_empty())
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        let app_entries = app_ids
+            .iter()
+            .map(|extension_id| {
+                format!(
+                    r#"  <app appid="{extension_id}">
+    <updatecheck codebase="{base_url}/extension.crx" version="{version}" />
+  </app>"#,
+                    extension_id = extension_id,
+                    base_url = self
+                        .config
+                        .base_url()
+                        .unwrap_or_else(|_| "http://127.0.0.1:48555".to_string()),
+                    version = self.config.package.extension_version,
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
         format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
 <gupdate xmlns="http://www.google.com/update2/response" protocol="2.0">
-  <app appid="{extension_id}">
-    <updatecheck codebase="{base_url}/extension.crx" version="{version}" />
-  </app>
+{app_entries}
 </gupdate>
 "#,
-            extension_id = self.config.package.extension_id,
-            base_url = self
-                .config
-                .base_url()
-                .unwrap_or_else(|_| "http://127.0.0.1:48555".to_string()),
-            version = self.config.package.extension_version,
+            app_entries = app_entries,
         )
     }
 }
@@ -66,8 +124,9 @@ pub async fn run(config: AppConfig, shutdown: impl Future<Output = ()> + Send) -
         .context("failed to bind local API listener")?;
     let http_cancel = cancel.clone();
     let managed_pii_config = state.config.managed_pii.clone().filter(|item| item.enabled);
+    let pii_readiness = state.pii_readiness.clone();
 
-    info!(listen = %listen_addr, "starting Ulti Guard Agent daemon");
+    info!(listen = %listen_addr, "starting Ulti Guard daemon");
     let mut server_handle = tokio::spawn(async move {
         axum::serve(listener, router)
             .with_graceful_shutdown(http_cancel.cancelled_owned())
@@ -82,7 +141,7 @@ pub async fn run(config: AppConfig, shutdown: impl Future<Output = ()> + Send) -
     let pii_cancel = cancel.clone();
     let pii_handle = tokio::spawn(async move {
         match managed_pii_config {
-            Some(config) => managed_pii::run(config, pii_cancel).await,
+            Some(config) => managed_pii::run(config, pii_readiness, pii_cancel).await,
             None => {
                 pii_cancel.cancelled_owned().await;
                 Ok(())

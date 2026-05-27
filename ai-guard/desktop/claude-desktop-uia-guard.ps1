@@ -44,7 +44,13 @@ try {
     $config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
     $baseUrl = "http://$($config.listen_address)"
     $authToken = "$($config.auth_token)"
-    $extensionId = "$($config.package.extension_id)"
+    $extensionId = "$($config.package.edge_extension_id)"
+    if (-not $extensionId) {
+        $extensionId = "$($config.package.chrome_extension_id)"
+    }
+    if (-not $extensionId) {
+        $extensionId = "$($config.package.extension_id)"
+    }
     if (-not $extensionId) {
         $extensionId = @($config.extension_ids)[0]
     }
@@ -236,9 +242,9 @@ try {
         )
 
         $text = if ([string]::IsNullOrWhiteSpace($Message)) {
-            "Ulti Guard Agent blocked this Claude Desktop prompt."
+            "Ulti Guard blocked this Claude Desktop prompt."
         } else {
-            "Ulti Guard Agent: $Message"
+            "Ulti Guard: $Message"
         }
 
         $key = if ([string]::IsNullOrWhiteSpace($DedupKey)) { $text } else { $DedupKey }
@@ -377,6 +383,15 @@ public static class AiGuardToastNativeMethods {
             $state.LastNormalizedText = $normalizedText
             $response = Invoke-Scan -Text $currentText
             if (-not $response -or -not $response.action) {
+                $state.LastNormalizedText = ""
+                Start-Sleep -Milliseconds $PollMs
+                continue
+            }
+
+            if ([string]$response.decision_kind -eq "scan_error") {
+                $state.LastNormalizedText = ""
+                $toastPlacement = Get-ToastPlacement -Editor $editor
+                Show-DesktopToast -Message ([string]$response.reason) -DedupKey "scan_error:$($response.reason)" -Placement $toastPlacement
                 Start-Sleep -Milliseconds $PollMs
                 continue
             }

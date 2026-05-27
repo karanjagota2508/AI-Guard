@@ -9,18 +9,24 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
 use crate::config::ManagedPiiConfig;
+use crate::runtime::PiiServiceReadiness;
 
 const HEALTH_POLL_INTERVAL_MS: u64 = 1500;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-pub async fn run(config: ManagedPiiConfig, cancel: CancellationToken) -> Result<()> {
+pub async fn run(
+    config: ManagedPiiConfig,
+    readiness: PiiServiceReadiness,
+    cancel: CancellationToken,
+) -> Result<()> {
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(2))
         .build()
         .context("failed to build managed PII health client")?;
 
     let mut child: Option<Child> = None;
+    readiness.mark_ready(false);
 
     loop {
         if cancel.is_cancelled() {
@@ -28,12 +34,15 @@ pub async fn run(config: ManagedPiiConfig, cancel: CancellationToken) -> Result<
         }
 
         if probe_health(&client, &config.health_url).await {
+            readiness.mark_ready(true);
             tokio::select! {
                 _ = cancel.cancelled() => break,
                 _ = sleep(std::time::Duration::from_millis(HEALTH_POLL_INTERVAL_MS)) => {}
             }
             continue;
         }
+
+        readiness.mark_ready(false);
 
         if let Some(running_child) = child.as_mut() {
             if let Some(status) = running_child
@@ -59,6 +68,7 @@ pub async fn run(config: ManagedPiiConfig, cancel: CancellationToken) -> Result<
             let mut spawned_child = spawn_child(&config)?;
             wait_for_startup(&client, &config, &mut spawned_child, &cancel).await?;
             info!("managed PII agent is healthy");
+            readiness.mark_ready(true);
             child = Some(spawned_child);
         } else {
             warn!("managed PII agent is unhealthy but still running");
@@ -73,6 +83,7 @@ pub async fn run(config: ManagedPiiConfig, cancel: CancellationToken) -> Result<
         info!("stopping managed PII agent");
         terminate_child(&mut child).await;
     }
+    readiness.mark_ready(false);
 
     Ok(())
 }

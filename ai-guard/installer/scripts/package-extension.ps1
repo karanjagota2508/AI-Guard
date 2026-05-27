@@ -1,16 +1,40 @@
 param(
-    [string]$OutputPath = (Join-Path (Split-Path $PSScriptRoot -Parent) "dist\ai-guard-extension.crx")
+    [string]$OutputPath = (Join-Path (Split-Path $PSScriptRoot -Parent) "dist\ai-guard-extension.crx"),
+    [string]$ChromeStoreZipPath = "",
+    [string]$EdgeStoreZipPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 
+$localUpdateUrl = "http://127.0.0.1:48555/update.xml"
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $sourceDir = Join-Path $repoRoot "extension"
 $privateKeyPath = Join-Path $repoRoot "installer\assets\extension-private-key.pem"
 $distDir = Split-Path $OutputPath -Parent
 $tempRoot = Join-Path $env:TEMP ("ai-guard-extension-" + [Guid]::NewGuid().ToString("N"))
-$tempSource = Join-Path $tempRoot "extension"
+$tempLocalSource = Join-Path $tempRoot "extension-local"
+$tempStoreSource = Join-Path $tempRoot "extension-store"
 $tempProfile = Join-Path $tempRoot "profile"
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+if (-not $ChromeStoreZipPath) {
+    $ChromeStoreZipPath = Join-Path $distDir "ai-guard-extension-chrome-store.zip"
+}
+
+if (-not $EdgeStoreZipPath) {
+    $EdgeStoreZipPath = Join-Path $distDir "ai-guard-extension-edge-store.zip"
+}
+
+function Write-JsonNoBom {
+    param(
+        [string]$Path,
+        $Object
+    )
+
+    $json = $Object | ConvertTo-Json -Depth 20
+    [System.IO.File]::WriteAllText($Path, $json, (New-Object System.Text.UTF8Encoding($false)))
+}
 
 function Get-BrowserPackers {
     $candidates = @(
@@ -35,10 +59,21 @@ function Get-BrowserPackers {
 }
 
 New-Item -ItemType Directory -Force -Path $distDir | Out-Null
-New-Item -ItemType Directory -Force -Path $tempSource, $tempProfile | Out-Null
-Copy-Item -Path (Join-Path $sourceDir "*") -Destination $tempSource -Recurse -Force
+New-Item -ItemType Directory -Force -Path $tempLocalSource, $tempStoreSource, $tempProfile | Out-Null
+Copy-Item -Path (Join-Path $sourceDir "*") -Destination $tempLocalSource -Recurse -Force
+Copy-Item -Path (Join-Path $sourceDir "*") -Destination $tempStoreSource -Recurse -Force
+foreach ($artifactPath in @($OutputPath, $ChromeStoreZipPath, $EdgeStoreZipPath)) {
+    if ($artifactPath -and (Test-Path $artifactPath)) {
+        Remove-Item -Path $artifactPath -Force
+    }
+}
 
-$generatedCrx = "$tempSource.crx"
+$localManifestPath = Join-Path $tempLocalSource "manifest.json"
+$localManifest = Get-Content -Path $localManifestPath -Raw | ConvertFrom-Json
+$localManifest | Add-Member -NotePropertyName "update_url" -NotePropertyValue $localUpdateUrl -Force
+Write-JsonNoBom -Path $localManifestPath -Object $localManifest
+
+$generatedCrx = "$tempLocalSource.crx"
 $browserAttempts = @()
 
 foreach ($browserExe in Get-BrowserPackers) {
@@ -49,7 +84,7 @@ foreach ($browserExe in Get-BrowserPackers) {
     $arguments = @(
         "--user-data-dir=$tempProfile",
         "--no-first-run",
-        "--pack-extension=$tempSource",
+        "--pack-extension=$tempLocalSource",
         "--pack-extension-key=$privateKeyPath"
     )
 
@@ -70,5 +105,9 @@ if (-not (Test-Path $generatedCrx)) {
 }
 
 Copy-Item -Path $generatedCrx -Destination $OutputPath -Force
+[System.IO.Compression.ZipFile]::CreateFromDirectory($tempStoreSource, $ChromeStoreZipPath)
+[System.IO.Compression.ZipFile]::CreateFromDirectory($tempStoreSource, $EdgeStoreZipPath)
 Remove-Item -Path $tempRoot -Recurse -Force
-Write-Host "Packaged extension to $OutputPath"
+Write-Host "Packaged local test extension to $OutputPath"
+Write-Host "Packaged Chrome store submission to $ChromeStoreZipPath"
+Write-Host "Packaged Edge store submission to $EdgeStoreZipPath"

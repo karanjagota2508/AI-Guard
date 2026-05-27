@@ -95,9 +95,25 @@ function Invoke-SignTool {
 
     $arguments += $FilePath
 
-    & $SignToolPath @arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "signtool failed for $FilePath with exit code $LASTEXITCODE"
+    $maxAttempts = 5
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt += 1) {
+        $signOutput = & $SignToolPath @arguments 2>&1
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -eq 0) {
+            return
+        }
+
+        $outputText = ($signOutput | Out-String)
+        if ($attempt -lt $maxAttempts -and $outputText -match 'being used by another process') {
+            Start-Sleep -Seconds ([Math]::Min($attempt * 2, 8))
+            continue
+        }
+
+        if ($outputText) {
+            Write-Host $outputText.TrimEnd()
+        }
+
+        throw "signtool failed for $FilePath with exit code $exitCode"
     }
 }
 

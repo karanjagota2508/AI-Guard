@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Ulti Guard Agent",
+  "name": "Ulti Guard",
   "version": "1.0.4",
   "description": "Protect Claude sessions with prompt scanning and LLM isolation.",
   "icons": {
@@ -12,7 +12,6 @@
   "incognito": "split",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqCfHsdVCyX0omFJ5nLZVSDZ1uWic+VgIBWu/OtU/U2mCiBYs1zFeVWN/gDBtJSkHOPxRZVWoMXoWSI6/Py/BGHAOs5qY1vRH28CwngYqe553lYyjbj8FnixQBw4HLWrwsFGEefCu9pmYsvA//j5zOShSmQjfIZARPXWTxCF8zGs99C7YeCSlo3z4lU9S4FXqlI3sC/FeA7KlsSp3x+9VO10PKoyI0PCxQGy/L0ORFiGjPQVkRN+N1xSCYN/ZtNyLnk/YthbxTyyq8iluyrzsC1Pv9Fvqrv2edVBiCbpTjC6XGUHP7QzhTrDeeI9I8lCwELTIDb2Rq+fI0cloj+Vc1wIDAQAB",
   "minimum_chrome_version": "120",
-  "update_url": "http://127.0.0.1:48555/update.xml",
   "permissions": [
     "nativeMessaging",
     "storage",
@@ -37,9 +36,7 @@
     {
       "matches": [
         "https://claude.ai/*",
-        "https://claude.com/*",
-        "http://127.0.0.1:48555/__ulti_guard_test__/*",
-        "http://localhost:48555/__ulti_guard_test__/*"
+        "https://claude.com/*"
       ],
       "js": [
         "content-script.js"
@@ -48,7 +45,7 @@
     }
   ],
   "action": {
-    "default_title": "Ulti Guard Agent",
+    "default_title": "Ulti Guard",
     "default_icon": {
       "16": "assets/icon16.png",
       "32": "assets/icon32.png",

@@ -76,7 +76,7 @@ fn enforce_process_blocking(config: &AppConfig, system: &System) {
 
         if blocked
             .iter()
-            .any(|candidate| normalized == *candidate || normalized.starts_with(candidate))
+            .any(|candidate| normalized == *candidate || (candidate.len() >= 4 && normalized.starts_with(candidate)))
         {
             warn!(
                 pid = pid_u32,
@@ -99,12 +99,23 @@ fn matches_process(name: &str, candidates: &[String]) -> bool {
     let normalized = normalize_process_name(name);
     candidates.iter().any(|candidate| {
         let expected = normalize_process_name(candidate);
-        normalized == expected || normalized.starts_with(&expected)
+        if normalized == expected {
+            return true;
+        }
+        if expected.len() >= 4 && normalized.starts_with(&expected) {
+            return true;
+        }
+        false
     })
 }
 
 fn normalize_process_name(value: &str) -> String {
-    value
+    let name_without_exe = if value.len() > 4 && value.to_ascii_lowercase().ends_with(".exe") {
+        &value[..value.len() - 4]
+    } else {
+        value
+    };
+    name_without_exe
         .chars()
         .filter(|ch| ch.is_ascii_alphanumeric())
         .collect::<String>()
@@ -137,4 +148,31 @@ fn foreground_process_name(system: &System) -> Option<String> {
 #[cfg(not(windows))]
 fn foreground_process_name(_system: &System) -> Option<String> {
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{matches_process, normalize_process_name};
+
+    #[test]
+    fn normalizes_process_name_without_punctuation() {
+        assert_eq!(normalize_process_name("LM Studio.exe"), "lmstudio");
+    }
+
+    #[test]
+    fn matches_process_with_prefix_normalization() {
+        assert!(matches_process("Cursor.exe", &[String::from("Cursor")]));
+        assert!(matches_process("Ollama App", &[String::from("Ollama")]));
+    }
+
+    #[test]
+    fn short_process_candidate_requires_exact_match() {
+        assert!(matches_process("jan.exe", &[String::from("jan")]));
+        assert!(!matches_process("janitor.exe", &[String::from("jan")]));
+    }
+
+    #[test]
+    fn does_not_match_unrelated_process() {
+        assert!(!matches_process("notepad.exe", &[String::from("Cursor")]));
+    }
 }

@@ -195,7 +195,10 @@ $claudePatchScript = Join-Path $InstallerScriptRoot "scripts\patch-claude-deskto
 if ($isAdmin) {
     if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
         Stop-Service -Name $serviceName -ErrorAction SilentlyContinue
-        sc.exe delete $serviceName | Out-Null
+        $service = Get-CimInstance -ClassName Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue
+        if ($service) {
+            $service | Invoke-CimMethod -MethodName Delete -ErrorAction SilentlyContinue | Out-Null
+        }
         Start-Sleep -Seconds 2
     }
 } else {

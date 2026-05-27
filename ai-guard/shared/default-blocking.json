@@ -1,0 +1,23 @@
+{
+  "browser_hosts": [
+    "chatgpt.com",
+    "chat.openai.com",
+    "gemini.google.com",
+    "perplexity.ai",
+    "www.perplexity.ai"
+  ],
+  "process_names": [
+    "ChatGPT",
+    "Cursor",
+    "Ollama",
+    "LM Studio",
+    "OpenWebUI",
+    "AnythingLLM",
+    "Jan"
+  ],
+  "exempt_process_names": [
+    "ai-guard-daemon",
+    "msedge",
+    "chrome"
+  ]
+}
