@@ -10,7 +10,7 @@
   },
   "managed_pii": {
     "enabled": true,
-    "executable": "python",
+    "executable": "../installer/dist/python-runtime/python.exe",
     "args": [
       "main.py"
     ],
@@ -23,7 +23,8 @@
       "PORT": "8000",
       "PII_SERVICE_RELOAD": "false",
       "PII_SERVICE_CORS_ORIGINS": "http://127.0.0.1,http://localhost",
-      "PII_SERVICE_STARTUP_DELAY_MS": "0"
+      "PII_SERVICE_STARTUP_DELAY_MS": "0",
+      "PYTHONPATH": "../../PII_agent/backend;../installer/dist/pii-runtime/venv/Lib/site-packages"
     },
     "stdout_log_path": "../logs/pii-agent.stdout.log",
     "stderr_log_path": "../logs/pii-agent.stderr.log"

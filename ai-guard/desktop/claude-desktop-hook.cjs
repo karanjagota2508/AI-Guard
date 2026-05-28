@@ -514,10 +514,19 @@ function insertIntoContentEditableSelection(editor, value) {
 }
 
 function replaceContentEditableSelection(editor, value) {
-  editor.textContent = "";
+  editor.focus();
   const selection = window.getSelection();
   const range = document.createRange();
   range.selectNodeContents(editor);
+  selection.removeAllRanges();
+  selection.addRange(range);
+
+  const inserted = document.execCommand("insertText", false, value);
+  if (inserted) {
+    return;
+  }
+
+  // Fallback if execCommand fails
   range.deleteContents();
   const node = document.createTextNode(value);
   range.insertNode(node);

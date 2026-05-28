@@ -31,4 +31,8 @@ dotnet publish `
     -p:EnableCompressionInSingleFile=true `
     -p:IncludeNativeLibrariesForSelfExtract=true
 
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to publish the Ulti Guard admin console."
+}
+
 Write-Host "Published Ulti Guard admin console to $outputDirectory"

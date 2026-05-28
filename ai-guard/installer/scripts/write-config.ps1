@@ -15,6 +15,7 @@ param(
     [string]$PiiWorkingDirectory,
     [string]$PiiStdoutLogPath,
     [string]$PiiStderrLogPath,
+    [string]$PiiPythonPath = "",
     [int]$PiiStartupDelayMs = 0,
     [string[]]$ClaudeWebHosts = @("claude.ai", "claude.com")
 )
@@ -50,6 +51,14 @@ $blockingDefaults = if (Test-Path $defaultsPath) {
     }
 }
 $extensionIds = @($ChromeExtensionId, $EdgeExtensionId | Where-Object { $_ } | Select-Object -Unique)
+$resolvedPiiPythonPath = if ($PiiPythonPath) {
+    $PiiPythonPath
+} elseif ($PiiWorkingDirectory) {
+    $sitePackagesCandidate = Join-Path (Split-Path $PiiWorkingDirectory -Parent) "venv\Lib\site-packages"
+    "$PiiWorkingDirectory;$sitePackagesCandidate"
+} else {
+    ""
+}
 
 $config = @{
     listen_address = "${DaemonHost}:${DaemonPort}"
@@ -75,6 +84,7 @@ $config = @{
             PII_SERVICE_RELOAD = "false"
             PII_SERVICE_CORS_ORIGINS = "http://127.0.0.1,http://localhost"
             PII_SERVICE_STARTUP_DELAY_MS = "$PiiStartupDelayMs"
+            PYTHONPATH = $resolvedPiiPythonPath
         }
         stdout_log_path = $PiiStdoutLogPath
         stderr_log_path = $PiiStderrLogPath

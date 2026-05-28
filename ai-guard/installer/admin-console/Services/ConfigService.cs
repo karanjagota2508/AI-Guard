@@ -79,6 +79,13 @@ internal sealed class ConfigService
         {
             pii["action"] = "redact";
         }
+
+        var claude = root["claude"] as JsonObject ?? new JsonObject();
+        root["claude"] = claude;
+        if (claude["desktop_protection_mode"] == null)
+        {
+            claude["desktop_protection_mode"] = "hook_preferred";
+        }
     }
 
     public bool GetPiiEnabled(JsonObject root) =>

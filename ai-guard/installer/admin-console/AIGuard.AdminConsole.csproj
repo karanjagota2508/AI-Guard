@@ -11,4 +11,8 @@
     <AssemblyName>AI-Guard-Admin-Console</AssemblyName>
     <RootNamespace>AIGuard.AdminConsole</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\native-core\AIGuard.Native.csproj" />
+  </ItemGroup>
 </Project>

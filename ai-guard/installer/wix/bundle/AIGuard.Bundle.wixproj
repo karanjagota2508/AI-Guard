@@ -1,0 +1,15 @@
+<Project Sdk="WixToolset.Sdk/4.0.5">
+  <PropertyGroup>
+    <OutputType>Bundle</OutputType>
+    <TargetName>Ulti Guard Setup</TargetName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <DefineConstants>
+      BundleVersion=$(BundleVersion);
+      MsiPath=$(MsiPath)
+    </DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Bal.wixext" Version="4.0.5" />
+  </ItemGroup>
+</Project>

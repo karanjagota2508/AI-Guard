@@ -1,0 +1,12 @@
+<Project Sdk="WixToolset.Sdk/4.0.5">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <TargetName>Ulti Guard</TargetName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <SuppressIces>ICE38;ICE43;ICE57</SuppressIces>
+    <DefineConstants>
+      PayloadRoot=$(PayloadRoot);
+      ProductVersion=$(ProductVersion)
+    </DefineConstants>
+  </PropertyGroup>
+</Project>

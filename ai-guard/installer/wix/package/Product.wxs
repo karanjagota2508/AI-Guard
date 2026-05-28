@@ -1,0 +1,102 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Ulti Guard"
+    Manufacturer="WinInfoSoft"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="{D6D1AF5C-FE6A-434B-AFB1-92B360AFD235}"
+    Language="1033"
+    Scope="perMachine"
+    InstallerVersion="500"
+    Compressed="yes">
+
+    <SummaryInformation Description="Ulti Guard native installer package" Manufacturer="WinInfoSoft" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Ulti Guard is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="ProductIcon" SourceFile="$(var.PayloadRoot)\branding\logo.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="AI Guard Agent">
+        <Directory Id="ADMINCONSOLEDIR" Name="admin-console" />
+        <Directory Id="DESKTOPHOOKDIR" Name="desktop" />
+        <Directory Id="DESKTOPSESSIONDIR" Name="desktop-session" />
+        <Directory Id="SETUPACTIONSDIR" Name="setup-actions" />
+        <Directory Id="SHAREDDIR" Name="shared" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ProgramMenuDir" Name="Ulti Guard" />
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="Ulti Guard" Level="1">
+      <ComponentGroupRef Id="PayloadComponents" />
+      <ComponentGroupRef Id="ShortcutComponents" />
+      <ComponentGroupRef Id="RegistryComponents" />
+    </Feature>
+
+    <CustomAction
+      Id="RollbackNativeInstall"
+      FileRef="SetupActionsExeFile"
+      ExeCommand="uninstall --keep-files"
+      Execute="rollback"
+      Return="ignore"
+      Impersonate="no"
+      HideTarget="yes" />
+
+    <CustomAction
+      Id="RunNativeInstall"
+      FileRef="SetupActionsExeFile"
+      ExeCommand="install"
+      Execute="deferred"
+      Return="check"
+      Impersonate="no"
+      HideTarget="yes" />
+
+    <CustomAction
+      Id="RunNativeRepair"
+      FileRef="SetupActionsExeFile"
+      ExeCommand="repair"
+      Execute="deferred"
+      Return="check"
+      Impersonate="no"
+      HideTarget="yes" />
+
+    <CustomAction
+      Id="RunNativeUninstall"
+      FileRef="SetupActionsExeFile"
+      ExeCommand="uninstall"
+      Execute="deferred"
+      Return="check"
+      Impersonate="no"
+      HideTarget="yes" />
+
+    <InstallExecuteSequence>
+      <Custom Action="RollbackNativeInstall" Before="RunNativeInstall" Condition='NOT REMOVE="ALL"' />
+      <Custom Action="RunNativeInstall" After="InstallFiles" Condition='NOT Installed AND NOT REMOVE="ALL"' />
+      <Custom Action="RunNativeRepair" After="RunNativeInstall" Condition='Installed AND NOT REMOVE="ALL"' />
+      <Custom Action="RunNativeUninstall" Before="RemoveFiles" Condition='REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE' />
+    </InstallExecuteSequence>
+
+    <ComponentGroup Id="RegistryComponents" Directory="INSTALLFOLDER">
+      <Component Id="InstallRootRegistryComponent" Guid="{C0E3A82B-A409-41A6-94BB-7FD399FC2D74}" Bitness="always64">
+        <RegistryValue Root="HKLM" Key="SOFTWARE\WinInfoSoft\AI Guard Agent" Name="InstallRoot" Value="[INSTALLFOLDER]" Type="string" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="ShortcutComponents" Directory="ProgramMenuDir">
+      <Component Id="AdminConsoleShortcutComponent" Guid="{F18B1EB4-4A0D-4D83-880C-E61A6E73D1E9}">
+        <Shortcut
+          Id="AdminConsoleShortcut"
+          Name="Ulti Guard Admin Console"
+          Description="Open the Ulti Guard Admin Console."
+          Target="[INSTALLFOLDER]admin-console\AI-Guard-Admin-Console.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Arguments="--config &quot;[INSTALLFOLDER]config\ai-guard.json&quot;" />
+        <RemoveFolder Id="ProgramMenuDirCleanup" On="uninstall" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\WinInfoSoft\AI Guard Agent\Shortcuts" Name="AdminConsole" Value="1" Type="integer" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Package>
+</Wix>

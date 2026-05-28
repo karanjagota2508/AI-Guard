@@ -171,3 +171,20 @@ pub struct NativeErrorResponse {
     pub kind: &'static str,
     pub message: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::UltibotOperatorConfig;
+
+    #[test]
+    fn anonymize_operator_serializes_with_type_field_name() {
+        let payload = serde_json::to_value(UltibotOperatorConfig {
+            operator_type: "redact".to_string(),
+            new_value: "<REDACTED>".to_string(),
+        })
+        .unwrap();
+
+        assert_eq!(payload.get("type").and_then(|value| value.as_str()), Some("redact"));
+        assert!(payload.get("operator_type").is_none());
+    }
+}

@@ -73,27 +73,33 @@ mod service_impl {
             .enable_all()
             .build()?;
 
-        runtime.block_on(async move {
+        let runtime_result = runtime.block_on(async move {
             let shutdown = async {
                 while !stop_requested.load(Ordering::SeqCst) {
                     time::sleep(Duration::from_secs(1)).await;
                 }
             };
 
-            let _ = runtime::run(config, shutdown).await;
+            runtime::run(config, shutdown).await
         });
+
+        let exit_code = if runtime_result.is_ok() {
+            ServiceExitCode::Win32(0)
+        } else {
+            ServiceExitCode::ServiceSpecific(1)
+        };
 
         status_handle.set_service_status(ServiceStatus {
             service_type: ServiceType::OWN_PROCESS,
             current_state: ServiceState::Stopped,
             controls_accepted: ServiceControlAccept::empty(),
-            exit_code: ServiceExitCode::Win32(0),
+            exit_code: exit_code,
             checkpoint: 0,
             wait_hint: Duration::default(),
             process_id: None,
         })?;
 
-        Ok(())
+        runtime_result
     }
 }
 

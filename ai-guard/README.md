@@ -9,7 +9,8 @@ One installation deploys:
 - A Chrome/Edge Manifest V3 extension that injects only on `https://claude.ai/*` and `https://claude.com/*`
 - Claude Desktop protection for standard installs plus a Store/MSIX fallback path
 - A compiled WPF admin console for provider and policy management
-- A compiled self-contained setup EXE for install, repair, and uninstall
+- A native desktop session helper for UIAutomation fallback mode
+- A WiX-backed MSI + bundle installer path for install, repair, upgrade, and uninstall
 
 ## Repository Layout
 
@@ -18,7 +19,7 @@ ai-guard/
   daemon/      Rust daemon and Windows service
   extension/   Manifest V3 extension
   shared/      Shared contracts
-  installer/   Setup app, admin console, packaging scripts, install scripts
+  installer/   Native helper projects, WiX packaging, legacy setup app, packaging scripts
   config/      Example configuration
   tests/       Browser smoke fixture and automation
 ```
@@ -81,16 +82,34 @@ Publish the admin console:
 .\installer\scripts\publish-admin-console.ps1
 ```
 
-Build the self-contained setup EXE:
+Publish the desktop session helper:
+
+```powershell
+.\installer\scripts\publish-desktop-session.ps1
+```
+
+Publish the native setup-actions helper:
+
+```powershell
+.\installer\scripts\publish-setup-actions.ps1
+```
+
+Build the sealed local PII runtime:
+
+```powershell
+.\installer\scripts\build-pii-runtime.ps1
+```
+
+Build the native MSI + bundle installer:
+
+```powershell
+.\installer\scripts\build-native-installer.ps1 -Version 1.0.0
+```
+
+Legacy WPF bootstrapper build:
 
 ```powershell
 .\installer\scripts\build-setup-exe.ps1
-```
-
-Offline-style setup output with bundled wheelhouse:
-
-```powershell
-.\installer\scripts\build-setup-exe.ps1 -IncludeWheelhouse -OutputPath .\artifacts\AI-Guard-Setup-offline.exe
 ```
 
 ## Install
@@ -116,15 +135,20 @@ C:\Program Files\AI Guard Agent
 The installer:
 
 - copies the daemon, extension, admin console, Claude Desktop assets, and branding
-- provisions a private Python runtime and the bundled PII backend
+- installs a prebuilt sealed local PII runtime instead of provisioning one on the customer machine
 - writes `config\ai-guard.json`
 - registers the daemon as the `AIGuardAgent` Windows service
 - registers Chrome and Edge native messaging manifests
 - applies managed Chromium extension policy and optional URL blocklist policy
-- patches supported Claude Desktop installs and prepares the Store/MSIX fallback runtime
+- configures the native desktop session helper and prepares the Store/MSIX fallback runtime
 - creates the Start Menu entry `Ulti Guard Admin Console`
 
-The setup EXE (`installer/dist/AI-Guard-Setup.exe`) wraps the same install/uninstall engine in a WPF desktop application and does not require end users to run PowerShell manually.
+The canonical native installer artifacts are:
+
+- `installer/dist/Ulti Guard.msi`
+- `installer/dist/Ulti Guard Setup.exe`
+
+The older WPF setup EXE remains in the repo as a legacy path while the WiX installer flow is being hardened.
 
 ## Admin Console
 

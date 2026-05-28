@@ -10,3 +10,4 @@ __pycache__/
 **/Release/
 *.pfx
 *.cer
+ai-guard/installer/wix/package/Payload.generated.wxs
