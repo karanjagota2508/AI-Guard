@@ -68,12 +68,10 @@ public partial class MainWindow : Window
                 return;
             }
 
-            ConfigPathText.Text = FormatConfigPathForDisplay(_configPath);
-            ConfigPathText.ToolTip = FormatConfigPathForDisplay(_configPath);
-            InstallModeBadge.Text = _configService.IsMachineInstall(_configPath) ? "Machine Install" : "Current User Install";
+            UpdateConfigurationPresentation();
             LoadBranding();
             ReloadFromDisk();
-            StatusTextBlock.Text = $"Loaded config from {FormatConfigPathForDisplay(_configPath)}";
+            StatusTextBlock.Text = "Managed configuration loaded.";
         }
         catch (Exception ex)
         {
@@ -101,59 +99,61 @@ public partial class MainWindow : Window
         await Task.CompletedTask;
     }
 
-    private async Task<bool> EnsureAuthenticatedAsync()
+    private Task<bool> EnsureAuthenticatedAsync()
     {
         var secretPath = _configService.ResolveSecretPath(_configPath, _configRoot);
         var minimumPasswordLength = _configService.GetMinimumPasswordLength(_configRoot);
         if (!_secretStore.Exists(secretPath))
         {
-            var createDialog = new PasswordDialog(
+            return Task.FromResult(TrySaveAdminPassword(
+                secretPath,
                 "Create Admin Password",
                 "Set the password required to open Ulti Guard Admin Console on this device.",
                 "Set Password",
-                requireConfirmation: true,
-                minimumPasswordLength: minimumPasswordLength)
+                minimumPasswordLength));
+        }
+
+        while (true)
+        {
+            var promptDialog = new PasswordDialog(
+                "Admin Password Required",
+                "Enter the Ulti Guard Admin Console password to continue.",
+                "Unlock",
+                requireConfirmation: false,
+                minimumPasswordLength: minimumPasswordLength,
+                showForgotPassword: true)
             {
                 Owner = this
             };
 
-            if (createDialog.ShowDialog() != true)
+            if (promptDialog.ShowDialog() == true)
             {
-                return false;
+                var currentSecret = _secretStore.Load(secretPath);
+                if (_secretStore.Validate(promptDialog.Password, currentSecret))
+                {
+                    return Task.FromResult(true);
+                }
+
+                MessageBox.Show(
+                    "The password was incorrect.",
+                    "Ulti Guard Admin Console",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                continue;
             }
 
-            var payload = _secretStore.Create(createDialog.Password, _configService.GetPasswordIterations(_configRoot));
-            _secretStore.Save(secretPath, payload);
-            return true;
+            if (promptDialog.ForgotPasswordRequested)
+            {
+                if (TryResetForgottenPassword(secretPath, minimumPasswordLength))
+                {
+                    return Task.FromResult(true);
+                }
+
+                continue;
+            }
+
+            return Task.FromResult(false);
         }
-
-        var promptDialog = new PasswordDialog(
-            "Admin Password Required",
-            "Enter the Ulti Guard Admin Console password to continue.",
-            "Unlock",
-            requireConfirmation: false,
-            minimumPasswordLength: minimumPasswordLength)
-        {
-            Owner = this
-        };
-
-        if (promptDialog.ShowDialog() != true)
-        {
-            return false;
-        }
-
-        var currentSecret = _secretStore.Load(secretPath);
-        if (_secretStore.Validate(promptDialog.Password, currentSecret))
-        {
-            return true;
-        }
-
-        MessageBox.Show(
-            "The password was incorrect.",
-            "Ulti Guard Admin Console",
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
-        return await EnsureAuthenticatedAsync();
     }
 
     private void LoadBranding()
@@ -357,7 +357,7 @@ public partial class MainWindow : Window
     private void ReloadButton_Click(object sender, RoutedEventArgs e)
     {
         ReloadFromDisk();
-        StatusTextBlock.Text = $"Reloaded config from {FormatConfigPathForDisplay(_configPath)}";
+        StatusTextBlock.Text = "Managed configuration reloaded.";
     }
 
     private void RemoveHostButton_Click(object sender, RoutedEventArgs e)
@@ -374,24 +374,17 @@ public partial class MainWindow : Window
 
     private void ChangePasswordButton_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new PasswordDialog(
+        var secretPath = _configService.ResolveSecretPath(_configPath, _configRoot);
+        if (!TrySaveAdminPassword(
+                secretPath,
             "Change Admin Password",
             "Enter a new password for Ulti Guard Admin Console.",
             "Save Password",
-            requireConfirmation: true,
-            minimumPasswordLength: _configService.GetMinimumPasswordLength(_configRoot))
-        {
-            Owner = this
-        };
-
-        if (dialog.ShowDialog() != true)
+            _configService.GetMinimumPasswordLength(_configRoot)))
         {
             return;
         }
 
-        var secretPath = _configService.ResolveSecretPath(_configPath, _configRoot);
-        var payload = _secretStore.Create(dialog.Password, _configService.GetPasswordIterations(_configRoot));
-        _secretStore.Save(secretPath, payload);
         StatusTextBlock.Text = "Admin console password updated.";
         MessageBox.Show(
             "Admin console password updated successfully.",
@@ -555,15 +548,86 @@ public partial class MainWindow : Window
             .Any(arg => string.Equals(arg, name, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string FormatConfigPathForDisplay(string path)
+    private bool TrySaveAdminPassword(
+        string secretPath,
+        string title,
+        string message,
+        string primaryButtonText,
+        int minimumPasswordLength)
     {
-        if (string.IsNullOrWhiteSpace(path))
+        var dialog = new PasswordDialog(
+            title,
+            message,
+            primaryButtonText,
+            requireConfirmation: true,
+            minimumPasswordLength: minimumPasswordLength)
         {
-            return string.Empty;
+            Owner = this
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return false;
         }
 
-        return path.Replace("AI Guard Agent", "Ulti Guard", StringComparison.OrdinalIgnoreCase)
-            .Replace("Ulti Guard Agent", "Ulti Guard", StringComparison.OrdinalIgnoreCase);
+        var payload = _secretStore.Create(dialog.Password, _configService.GetPasswordIterations(_configRoot));
+        _secretStore.Save(secretPath, payload);
+        return true;
+    }
+
+    private bool TryResetForgottenPassword(string secretPath, int minimumPasswordLength)
+    {
+        var confirmation = MessageBox.Show(
+            this,
+            "Forgot Password will replace the current admin console password on this device."
+            + Environment.NewLine + Environment.NewLine
+            + "Continue only if you are the authorized local administrator.",
+            "Ulti Guard Admin Console",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (confirmation != MessageBoxResult.Yes)
+        {
+            return false;
+        }
+
+        if (!TrySaveAdminPassword(
+                secretPath,
+                "Reset Admin Password",
+                "Create a new password for Ulti Guard Admin Console.",
+                "Reset Password",
+                minimumPasswordLength))
+        {
+            return false;
+        }
+
+        MessageBox.Show(
+            this,
+            "Admin console password reset successfully.",
+            "Ulti Guard Admin Console",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+        return true;
+    }
+
+    private void UpdateConfigurationPresentation()
+    {
+        var summary = GetConfigurationSummary();
+        ConfigPathText.Text = summary;
+        ConfigPathText.ToolTip = summary;
+        InstallModeBadge.Text = _configService.IsMachineInstall(_configPath) ? "Machine Install" : "Current User Install";
+    }
+
+    private string GetConfigurationSummary()
+    {
+        if (string.IsNullOrWhiteSpace(_configPath))
+        {
+            return "Managed Ulti Guard settings are ready.";
+        }
+
+        return _configService.IsMachineInstall(_configPath)
+            ? "Machine-wide managed Ulti Guard settings are active for this device."
+            : "Current-user managed Ulti Guard settings are active for this Windows account.";
     }
 }
 

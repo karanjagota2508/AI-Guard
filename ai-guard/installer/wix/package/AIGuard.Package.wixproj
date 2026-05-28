@@ -9,4 +9,8 @@
       ProductVersion=$(ProductVersion)
     </DefineConstants>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="4.0.5" />
+  </ItemGroup>
 </Project>

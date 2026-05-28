@@ -11,7 +11,8 @@ public partial class PasswordDialog : Window
         string message,
         string primaryButtonText,
         bool requireConfirmation,
-        int minimumPasswordLength)
+        int minimumPasswordLength,
+        bool showForgotPassword = false)
     {
         InitializeComponent();
         Title = title;
@@ -19,6 +20,9 @@ public partial class PasswordDialog : Window
         PromptMessageBlock.Text = message;
         PrimaryButton.Content = primaryButtonText;
         ConfirmPanel.Visibility = requireConfirmation ? Visibility.Visible : Visibility.Collapsed;
+        ForgotPasswordButton.Visibility = showForgotPassword && !requireConfirmation
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         SizeToContent = SizeToContent.Height;
         MinHeight = requireConfirmation ? 320 : 260;
         RequireConfirmation = requireConfirmation;
@@ -33,6 +37,8 @@ public partial class PasswordDialog : Window
     }
 
     public bool RequireConfirmation { get; }
+
+    public bool ForgotPasswordRequested { get; private set; }
 
     public string Password => PasswordBox.Password;
 
@@ -53,6 +59,12 @@ public partial class PasswordDialog : Window
         DialogResult = false;
     }
 
+    private void ForgotPassword_Click(object sender, RoutedEventArgs e)
+    {
+        ForgotPasswordRequested = true;
+        DialogResult = false;
+    }
+
     private void UpdateValidation()
     {
         ValidateInputs();
@@ -69,7 +81,7 @@ public partial class PasswordDialog : Window
             return false;
         }
 
-        if (Password.Length < _minimumPasswordLength)
+        if (RequireConfirmation && Password.Length < _minimumPasswordLength)
         {
             ValidationBlock.Text = $"Password must be at least {_minimumPasswordLength} characters.";
             return false;

@@ -7,7 +7,12 @@
     UpgradeCode="{ED8B1573-CA4E-4347-A0B5-9AE31644D43E}">
 
     <BootstrapperApplication>
-      <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense" LicenseUrl="" />
+      <bal:WixStandardBootstrapperApplication
+        Theme="hyperlinkLicense"
+        LicenseUrl=""
+        LaunchTarget="[ProgramFiles64Folder]AI Guard Agent\admin-console\AI-Guard-Admin-Console.exe"
+        LaunchArguments='--config "[ProgramFiles64Folder]AI Guard Agent\config\ai-guard.json"'
+        LaunchWorkingFolder="[ProgramFiles64Folder]AI Guard Agent\admin-console" />
     </BootstrapperApplication>
 
     <Chain>
