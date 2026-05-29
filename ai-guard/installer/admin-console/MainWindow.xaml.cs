@@ -120,8 +120,7 @@ public partial class MainWindow : Window
                 "Enter the Ulti Guard Admin Console password to continue.",
                 "Unlock",
                 requireConfirmation: false,
-                minimumPasswordLength: minimumPasswordLength,
-                showForgotPassword: true)
+                minimumPasswordLength: minimumPasswordLength)
             {
                 Owner = this
             };
@@ -139,16 +138,6 @@ public partial class MainWindow : Window
                     "Ulti Guard Admin Console",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
-                continue;
-            }
-
-            if (promptDialog.ForgotPasswordRequested)
-            {
-                if (TryResetForgottenPassword(secretPath, minimumPasswordLength))
-                {
-                    return Task.FromResult(true);
-                }
-
                 continue;
             }
 
@@ -572,41 +561,6 @@ public partial class MainWindow : Window
 
         var payload = _secretStore.Create(dialog.Password, _configService.GetPasswordIterations(_configRoot));
         _secretStore.Save(secretPath, payload);
-        return true;
-    }
-
-    private bool TryResetForgottenPassword(string secretPath, int minimumPasswordLength)
-    {
-        var confirmation = MessageBox.Show(
-            this,
-            "Forgot Password will replace the current admin console password on this device."
-            + Environment.NewLine + Environment.NewLine
-            + "Continue only if you are the authorized local administrator.",
-            "Ulti Guard Admin Console",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-
-        if (confirmation != MessageBoxResult.Yes)
-        {
-            return false;
-        }
-
-        if (!TrySaveAdminPassword(
-                secretPath,
-                "Reset Admin Password",
-                "Create a new password for Ulti Guard Admin Console.",
-                "Reset Password",
-                minimumPasswordLength))
-        {
-            return false;
-        }
-
-        MessageBox.Show(
-            this,
-            "Admin console password reset successfully.",
-            "Ulti Guard Admin Console",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
         return true;
     }
 

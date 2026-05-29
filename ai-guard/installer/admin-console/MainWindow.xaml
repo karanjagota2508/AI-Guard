@@ -302,6 +302,64 @@
       </Setter>
     </Style>
 
+    <Style x:Key="SwitchCheckBoxStyle" TargetType="CheckBox">
+      <Setter Property="Foreground" Value="#F8FAFC" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <Grid SnapsToDevicePixels="True">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+
+              <Border x:Name="SwitchTrack"
+                      Width="48"
+                      Height="28"
+                      Background="#334155"
+                      BorderBrush="#475569"
+                      BorderThickness="1"
+                      CornerRadius="14"
+                      VerticalAlignment="Center">
+                <Grid Margin="3">
+                  <Ellipse x:Name="SwitchThumb"
+                           Width="20"
+                           Height="20"
+                           Fill="#F8FAFC"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Center" />
+                </Grid>
+              </Border>
+
+              <ContentPresenter Grid.Column="2"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True" />
+            </Grid>
+
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="#64748B" />
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="SwitchTrack" Property="Background" Value="#FF6B35" />
+                <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="#FF6B35" />
+                <Setter TargetName="SwitchThumb" Property="HorizontalAlignment" Value="Right" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="SwitchTrack" Property="Background" Value="#1E293B" />
+                <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="#334155" />
+                <Setter TargetName="SwitchThumb" Property="Fill" Value="#94A3B8" />
+                <Setter Property="Foreground" Value="#64748B" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
     <Style x:Key="PiiRadioButtonStyle" TargetType="RadioButton">
       <Setter Property="Background" Value="#F8FAFC" />
       <Setter Property="Foreground" Value="#1E293B" />
@@ -618,6 +676,7 @@
               <CheckBox x:Name="PiiEnabledCheckBox"
                         Grid.Column="1"
                         Content="Enable PII Scanning"
+                        Style="{StaticResource SwitchCheckBoxStyle}"
                         Foreground="#F8FAFC"
                         FontWeight="SemiBold"
                         VerticalAlignment="Center"

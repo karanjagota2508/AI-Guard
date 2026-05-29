@@ -2,7 +2,7 @@
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package
     Name="Ulti Guard"
-    Manufacturer="WinInfoSoft"
+    Manufacturer="TechHeights"
     Version="$(var.ProductVersion)"
     UpgradeCode="{D6D1AF5C-FE6A-434B-AFB1-92B360AFD235}"
     Language="1033"
@@ -10,8 +10,8 @@
     InstallerVersion="500"
     Compressed="yes">
 
-    <SummaryInformation Description="Ulti Guard native installer package" Manufacturer="WinInfoSoft" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Ulti Guard is already installed." />
+    <SummaryInformation Description="Ulti Guard native installer package" Manufacturer="TechHeights" />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of Ulti Guard is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
     <Icon Id="ProductIcon" SourceFile="$(var.PayloadRoot)\branding\logo.ico" />

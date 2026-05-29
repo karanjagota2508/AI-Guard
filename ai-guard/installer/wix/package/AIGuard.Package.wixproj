@@ -3,7 +3,7 @@
     <OutputType>Package</OutputType>
     <TargetName>Ulti Guard</TargetName>
     <InstallerPlatform>x64</InstallerPlatform>
-    <SuppressIces>ICE38;ICE43;ICE57</SuppressIces>
+    <SuppressIces>ICE38;ICE43;ICE57;ICE61</SuppressIces>
     <DefineConstants>
       PayloadRoot=$(PayloadRoot);
       ProductVersion=$(ProductVersion)

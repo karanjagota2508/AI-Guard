@@ -2,7 +2,7 @@
      xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
   <Bundle
     Name="Ulti Guard Setup"
-    Manufacturer="WinInfoSoft"
+    Manufacturer="TechHeights"
     Version="$(var.BundleVersion)"
     UpgradeCode="{ED8B1573-CA4E-4347-A0B5-9AE31644D43E}">
 
